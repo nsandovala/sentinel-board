@@ -1,9 +1,16 @@
 import { CardStatus, CardType, PriorityLevel } from "./enums";
 
+export type ChecklistItemStatus =
+  | "pending"
+  | "in_progress"
+  | "review"
+  | "blocked"
+  | "done";
+
 export interface ChecklistItem {
   id: string;
   text: string;
-  done: boolean;
+  status: ChecklistItemStatus;
 }
 
 export interface CodexLoopData {

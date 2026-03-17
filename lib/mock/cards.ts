@@ -11,9 +11,10 @@ export const cards: SentinelCard[] = [
     tags: ["ui", "layout", "core"],
     projectId: "5",
     checklist: [
-      { id: "1", text: "Definir grid principal", done: true },
-      { id: "2", text: "Crear sidebar", done: false },
-      { id: "3", text: "Crear right panel", done: false },
+      { id: "cl-1", text: "Definir grid principal", status: "done" },
+      { id: "cl-2", text: "Crear sidebar colapsable", status: "in_progress" },
+      { id: "cl-3", text: "Crear right panel HEO", status: "pending" },
+      { id: "cl-4", text: "Revisar responsive en mobile", status: "blocked" },
     ],
     blocked: false,
   },
@@ -26,7 +27,10 @@ export const cards: SentinelCard[] = [
     priority: "medium",
     tags: ["repo", "integration"],
     projectId: "4",
-    checklist: [],
+    checklist: [
+      { id: "cl-5", text: "Vincular repositorio GitHub", status: "pending" },
+      { id: "cl-6", text: "Definir tareas iniciales del sprint", status: "pending" },
+    ],
     blocked: false,
   },
   {
@@ -38,7 +42,13 @@ export const cards: SentinelCard[] = [
     priority: "high",
     tags: ["scoring", "codex"],
     projectId: "5",
-    checklist: [],
+    checklist: [
+      { id: "cl-7", text: "Investigar modelos de scoring", status: "done" },
+      { id: "cl-8", text: "Definir variables del motor", status: "done" },
+      { id: "cl-9", text: "Crear fórmula base", status: "review" },
+      { id: "cl-10", text: "Validar con datos reales", status: "in_progress" },
+      { id: "cl-11", text: "Documentar criterios", status: "pending" },
+    ],
     blocked: false,
   },
 ];
