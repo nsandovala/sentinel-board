@@ -1,0 +1,53 @@
+import { CardStatus, CardType, PriorityLevel } from "./enums";
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface CodexLoopData {
+  problem?: string;
+  objective?: string;
+  hypothesis?: string;
+  solution?: string;
+  validation?: string;
+  nextStep?: string;
+}
+
+export interface FiveWhysData {
+  why1?: string;
+  why2?: string;
+  why3?: string;
+  why4?: string;
+  why5?: string;
+  rootCause?: string;
+}
+
+export interface MoneyCodeData {
+  impact: number;
+  urgency: number;
+  effort: number;
+  returnValue: number;
+  strategyAlignment: number;
+  reuseValue: number;
+  validationValue: number;
+  score?: number;
+}
+
+export interface SentinelCard {
+  id: string;
+  title: string;
+  description?: string;
+  status: CardStatus;
+  type: CardType;
+  priority: PriorityLevel;
+  tags: string[];
+  projectId: string;
+  checklist: ChecklistItem[];
+  codexLoop?: CodexLoopData;
+  fiveWhys?: FiveWhysData;
+  moneyCode?: MoneyCodeData;
+  blocked?: boolean;
+  blockerReason?: string;
+}
