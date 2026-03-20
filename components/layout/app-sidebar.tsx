@@ -1,22 +1,34 @@
-import { projects } from "@/lib/mock/projects";
+"use client";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import type { ActiveView } from "@/lib/state/sentinel-reducer";
 
-const activeProjectId = "5";
-
-const navItems = [
-  { label: "Board", active: true },
-  { label: "Timeline", active: false },
-  { label: "Backlog", active: false },
-];
-
-const stats = [
-  { label: "Activas", value: "12" },
-  { label: "Revisión", value: "3" },
-  { label: "Hechas", value: "27" },
+const views: { key: ActiveView; label: string }[] = [
+  { key: "board", label: "Board" },
+  { key: "timeline", label: "Timeline" },
+  { key: "backlog", label: "Backlog" },
 ];
 
 export function AppSidebar() {
+  const { projects, cards, activeView } = useSentinel();
+  const dispatch = useSentinelDispatch();
+
+  const active = cards.filter(
+    (c) => !["listo", "produccion", "archivado"].includes(c.status),
+  ).length;
+  const review = cards.filter((c) => c.status === "qa" || c.status === "validando").length;
+  const done = cards.filter(
+    (c) => c.status === "listo" || c.status === "produccion",
+  ).length;
+
+  const stats = [
+    { label: "Activas", value: active },
+    { label: "Revisión", value: review },
+    { label: "Hechas", value: done },
+  ];
+
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
       {/* Branding */}
@@ -49,7 +61,7 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* Mini stats */}
+      {/* Live stats */}
       <div className="border-b border-border px-4 py-3">
         <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Resumen
@@ -71,21 +83,23 @@ export function AppSidebar() {
       {/* Navigation */}
       <div className="border-b border-border px-3 py-2">
         <nav className="flex flex-col gap-0.5">
-          {navItems.map((item) => (
-            <div
-              key={item.label}
+          {views.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => dispatch({ type: "SET_VIEW", view: v.key })}
               className={cn(
-                "relative flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
-                item.active
+                "relative flex w-full cursor-pointer items-center rounded-md px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors",
+                activeView === v.key
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
             >
-              {item.active && (
+              {activeView === v.key && (
                 <span className="absolute left-0 top-1/2 h-3 w-[2px] -translate-y-1/2 rounded-r-full bg-violet-400" />
               )}
-              {item.label}
-            </div>
+              {v.label}
+            </button>
           ))}
         </nav>
       </div>
@@ -104,25 +118,22 @@ export function AppSidebar() {
         <ScrollArea className="flex-1">
           <nav className="flex flex-col gap-0.5 px-3 pb-3">
             {projects.map((project) => {
-              const isActive = project.id === activeProjectId;
+              const count = cards.filter((c) => c.projectId === project.id).length;
               return (
                 <div
                   key={project.id}
-                  className={cn(
-                    "relative flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors",
-                    isActive
-                      ? "bg-muted font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                  )}
+                  className="flex cursor-default items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                 >
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 h-3 w-[2px] -translate-y-1/2 rounded-r-full bg-violet-400" />
-                  )}
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
                     style={{ backgroundColor: project.color }}
                   />
-                  <span className="truncate">{project.name}</span>
+                  <span className="flex-1 truncate">{project.name}</span>
+                  {count > 0 && (
+                    <span className="text-[10px] tabular-nums text-muted-foreground/60">
+                      {count}
+                    </span>
+                  )}
                 </div>
               );
             })}

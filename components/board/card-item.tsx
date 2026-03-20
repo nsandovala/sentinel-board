@@ -1,5 +1,8 @@
+"use client";
+
 import { SentinelCard, ChecklistItemStatus } from "@/types/card";
 import { cn } from "@/lib/utils";
+import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 
 const priorityConfig: Record<string, { classes: string; label: string }> = {
   low: { classes: "bg-emerald-500/15 text-emerald-400", label: "Low" },
@@ -45,20 +48,37 @@ function ChecklistSummary({ card }: { card: SentinelCard }) {
 }
 
 export function CardItem({ card }: CardItemProps) {
+  const { selectedCardId } = useSentinel();
+  const dispatch = useSentinelDispatch();
   const priority = priorityConfig[card.priority] ?? priorityConfig.medium;
+  const isSelected = selectedCardId === card.id;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id })}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id });
+        }
+      }}
       className={cn(
-        "group relative flex flex-col gap-2 rounded-lg border border-border bg-card p-3 pl-3.5",
-        "transition-all duration-150",
-        "hover:border-border hover:bg-card",
+        "group relative flex cursor-pointer flex-col gap-2 rounded-lg border bg-card p-3 pl-3.5",
+        "transition-all duration-150 outline-none",
+        isSelected
+          ? "border-violet-500/40 ring-1 ring-violet-500/20"
+          : "border-border hover:border-border",
       )}
     >
-      {/* Left accent on hover */}
-      <span className="absolute inset-y-0 left-0 w-[2px] rounded-l-lg bg-transparent transition-colors group-hover:bg-violet-500/50" />
+      <span
+        className={cn(
+          "absolute inset-y-0 left-0 w-[2px] rounded-l-lg transition-colors",
+          isSelected ? "bg-violet-500" : "bg-transparent group-hover:bg-violet-500/40",
+        )}
+      />
 
-      {/* Title + Priority */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-[13px] font-medium leading-snug text-card-foreground">
           {card.title}
@@ -73,14 +93,12 @@ export function CardItem({ card }: CardItemProps) {
         </span>
       </div>
 
-      {/* Description */}
       {card.description && (
         <p className="text-xs leading-relaxed text-foreground/60 line-clamp-2">
           {card.description}
         </p>
       )}
 
-      {/* Tags + Checklist */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <div className="flex flex-wrap gap-1">
           {card.tags.map((tag) => (
