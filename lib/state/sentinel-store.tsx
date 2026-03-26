@@ -23,6 +23,7 @@ const initialState: SentinelState = {
   cards: mockCards,
   events: initialEvents,
   selectedCardId: null,
+  selectedProjectId: null,
   activeView: "board",
   focusSession: { state: "idle", elapsed: 0 },
 };

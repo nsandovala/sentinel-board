@@ -1,0 +1,11 @@
+name: planner
+label: Planner Employee
+purpose: Sugerir prioridades, siguiente acción y foco operativo.
+input:
+  - cards
+  - events
+  - selected_card
+output:
+  - suggested_focus
+  - next_actions
+mode: advisory

@@ -83,47 +83,633 @@
 }
 
 .dark {
-  --background: oklch(0.145 0.004 285);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.185 0.006 280);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.185 0.006 280);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.72 0.14 280);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.22 0.008 280);
-  --secondary-foreground: oklch(0.90 0.005 270);
-  --muted: oklch(0.20 0.006 280);
-  --muted-foreground: oklch(0.75 0 0);
-  --accent: oklch(0.20 0.01 280);
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.65 0.15 280);
-  --chart-1: oklch(0.72 0.14 280);
-  --chart-2: oklch(0.65 0.18 275);
-  --chart-3: oklch(0.55 0.2 270);
-  --chart-4: oklch(0.50 0.2 265);
-  --chart-5: oklch(0.42 0.18 260);
-  --sidebar: oklch(0.13 0.006 285);
-  --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: oklch(0.72 0.14 280);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.22 0.02 280);
-  --sidebar-accent-foreground: oklch(0.93 0.01 275);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.65 0.15 280);
+  /* Industrial dark mate: lectura clara en títulos, metadata contenida */
+  --background: oklch(0.078 0.003 285);
+  --foreground: oklch(0.93 0.004 285);
+  --card: oklch(0.115 0.004 285);
+  --card-foreground: oklch(0.93 0.004 285);
+  --popover: oklch(0.112 0.004 285);
+  --popover-foreground: oklch(0.93 0.004 285);
+  /* Acento principal: violeta medio-bajo L, croma contenido */
+  --primary: oklch(0.44 0.088 283);
+  --primary-foreground: oklch(0.97 0.012 285);
+  --secondary: oklch(0.155 0.005 285);
+  --secondary-foreground: oklch(0.84 0.012 285);
+  --muted: oklch(0.145 0.004 285);
+  --muted-foreground: oklch(0.52 0.016 282);
+  --accent: oklch(0.154 0.007 283);
+  --accent-foreground: oklch(0.9 0.005 285);
+  --destructive: oklch(0.5 0.15 25);
+  /* Borde global: humo frío (más L, menos dureza que un gris cerrado) */
+  --border: oklch(0.4 0.014 282);
+  --input: oklch(0.2 0.01 285);
+  --ring: oklch(0.5 0.06 283);
+  --chart-1: oklch(0.52 0.09 282);
+  --chart-2: oklch(0.48 0.095 278);
+  --chart-3: oklch(0.44 0.09 275);
+  --chart-4: oklch(0.4 0.085 272);
+  --chart-5: oklch(0.36 0.08 268);
+  --sidebar: oklch(0.088 0.002 285);
+  --sidebar-foreground: oklch(0.86 0.007 285);
+  --sidebar-primary: oklch(0.44 0.088 283);
+  --sidebar-primary-foreground: oklch(0.97 0.012 285);
+  --sidebar-accent: oklch(0.138 0.007 283);
+  --sidebar-accent-foreground: oklch(0.86 0.01 285);
+  --sidebar-border: oklch(0.38 0.013 283);
+  --sidebar-ring: oklch(0.5 0.06 283);
+  /* Dock: carbón sólido, ribete superior más “nieve” que neón */
+  --dock-surface: oklch(0.056 0.005 285);
+  --dock-elevated: oklch(0.07 0.006 285);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/30;
   }
   body {
     @apply bg-background text-foreground;
   }
   html {
     @apply font-sans antialiased;
+  }
+
+  .dark {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/**
+ * Iridiscencia mínima: solo bordes/acentos finos (dock, foco, tarjeta activa).
+ * Sin glow global ni superficies brillantes.
+ */
+@layer utilities {
+  .sentinel-command-dock {
+    background-color: var(--dock-surface);
+    background-image: linear-gradient(
+        90deg,
+        oklch(0.72 0.02 285 / 0.14),
+        oklch(0.58 0.018 282 / 0.08),
+        oklch(0.65 0.022 275 / 0.1),
+        oklch(0.55 0.016 280 / 0.07)
+      ),
+      linear-gradient(var(--dock-surface), var(--dock-surface));
+    background-size:
+      100% 1px,
+      100% 100%;
+    background-repeat: no-repeat;
+    background-position:
+      top left,
+      0 0;
+  }
+
+  .sentinel-dock-expanded {
+    background-color: var(--dock-elevated);
+    background-image: linear-gradient(
+        90deg,
+        oklch(0.68 0.018 285 / 0.1),
+        oklch(0.52 0.014 282 / 0.06),
+        oklch(0.6 0.017 275 / 0.08)
+      ),
+      linear-gradient(var(--dock-elevated), var(--dock-elevated));
+    background-size:
+      100% 1px,
+      100% 100%;
+    background-repeat: no-repeat;
+    background-position:
+      top left,
+      0 0;
+  }
+
+  .sentinel-focus-chrome {
+    padding: 1px;
+    border-radius: 0.375rem;
+    background: linear-gradient(
+      145deg,
+      oklch(0.55 0.05 283 / 0.28),
+      oklch(0.42 0.04 285 / 0.16),
+      oklch(0.48 0.045 280 / 0.22)
+    );
+  }
+
+  .sentinel-focus-chrome-inner {
+    border-radius: 0.3125rem;
+    background-color: var(--dock-surface);
+  }
+
+  /* Selección: placa mate + acento lila seco (sin brillo ni borde blanco duro) */
+  .sentinel-card-iridescent {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(
+          168deg,
+          oklch(0.172 0.014 292) 0%,
+          oklch(0.145 0.011 289) 48%,
+          oklch(0.133 0.009 286) 100%
+        )
+        padding-box,
+      linear-gradient(
+          132deg,
+          oklch(0.44 0.048 292 / 0.2),
+          oklch(0.36 0.032 290 / 0.12),
+          oklch(0.4 0.038 288 / 0.16)
+        )
+        border-box;
+    box-shadow:
+      inset 0 1px 0 oklch(0.74 0.022 292 / 0.055),
+      inset 0 -1px 0 oklch(0 0 0 / 0.14),
+      0 3px 8px oklch(0 0 0 / 0.22),
+      0 10px 24px oklch(0 0 0 / 0.38),
+      0 0 0 1px oklch(0.22 0.035 292 / 0.18);
+    transform: translateY(0);
+  }
+
+  .sentinel-board-card.sentinel-card-iridescent:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 oklch(0.78 0.024 292 / 0.07),
+      inset 0 -1px 0 oklch(0 0 0 / 0.16),
+      0 4px 10px oklch(0 0 0 / 0.26),
+      0 14px 32px oklch(0 0 0 / 0.44),
+      0 0 0 1px oklch(0.24 0.038 292 / 0.22);
+  }
+
+  .sentinel-card-accent-selected {
+    background: linear-gradient(
+      180deg,
+      oklch(0.4 0.058 292 / 0.5),
+      oklch(0.32 0.042 290 / 0.3)
+    );
+    box-shadow: inset -1px 0 0 oklch(0.48 0.05 292 / 0.15);
+  }
+
+  .sentinel-nav-pip {
+    background: linear-gradient(
+      180deg,
+      oklch(0.58 0.06 283 / 0.4),
+      oklch(0.45 0.045 285 / 0.22)
+    );
+  }
+
+  .sentinel-right-rail-edge {
+    position: relative;
+  }
+
+  .sentinel-right-rail-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1px;
+    background: linear-gradient(
+      180deg,
+      oklch(0.55 0.02 285 / 0.18),
+      oklch(0.42 0.014 282 / 0.09),
+      oklch(0.5 0.018 283 / 0.12)
+    );
+    pointer-events: none;
+  }
+
+  /* Paneles: superficie sólida industrial (sin glass acuoso) */
+  .sentinel-glass-panel {
+    border-radius: 0.5625rem;
+    border: 1px solid oklch(0.38 0.01 285 / 0.55);
+    background-color: oklch(0.125 0.004 285);
+    box-shadow: inset 0 1px 0 oklch(0.52 0.012 285 / 0.06);
+  }
+
+  .sentinel-glass-panel--subtle {
+    border-color: oklch(0.36 0.009 285 / 0.42);
+    background-color: oklch(0.118 0.004 285);
+    box-shadow: inset 0 1px 0 oklch(0.48 0.01 285 / 0.045);
+  }
+
+  /* Jerarquía tipo producto (oscuro mate) */
+  .sentinel-product-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.022em;
+    line-height: 1.35;
+    color: oklch(0.94 0.004 285);
+  }
+
+  .sentinel-card-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.38;
+    color: oklch(0.93 0.004 285);
+  }
+
+  .sentinel-rail-section-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: oklch(0.5 0.018 282);
+  }
+
+  .sentinel-rail-body {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: oklch(0.84 0.008 285);
+  }
+
+  .sentinel-rail-meta {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: oklch(0.48 0.016 282);
+  }
+
+  .sentinel-rail-link {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: oklch(0.58 0.08 283);
+    text-underline-offset: 2px;
+  }
+
+  .sentinel-rail-link:hover {
+    color: oklch(0.66 0.09 283);
+  }
+
+  .sentinel-command-snippet-host {
+    position: relative;
+    margin-top: 0.5rem;
+  }
+
+  .sentinel-command-snippet-host .sentinel-command-snippet {
+    margin-top: 0;
+    padding-right: 2.75rem;
+  }
+
+  .sentinel-command-snippet-copy {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 0.3125rem;
+    border: 1px solid oklch(0.38 0.02 285 / 0.55);
+    background: linear-gradient(180deg, oklch(0.11 0.008 285 / 0.92) 0%, oklch(0.085 0.006 285 / 0.95) 100%);
+    color: oklch(0.58 0.05 288);
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .sentinel-command-snippet-copy:hover {
+    border-color: oklch(0.48 0.04 292 / 0.55);
+    color: oklch(0.72 0.08 292);
+    background: linear-gradient(180deg, oklch(0.14 0.012 292 / 0.88) 0%, oklch(0.1 0.01 285 / 0.92) 100%);
+  }
+
+  .sentinel-command-snippet-copy:focus-visible {
+    outline: 2px solid oklch(0.55 0.1 292 / 0.45);
+    outline-offset: 1px;
+  }
+
+  /* Bloque comando: JetBrains Mono (IDE) + fallback; tokens no heredan sans del rail */
+  .sentinel-command-snippet {
+    --sentinel-cmd-font: var(--font-jetbrains-mono), var(--font-geist-mono), ui-monospace, "SF Mono",
+      "Cascadia Code", Menlo, Monaco, Consolas, monospace;
+    display: block;
+    margin-top: 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid oklch(0.3 0.008 285 / 0.65);
+    background-color: oklch(0.052 0.004 285);
+    padding: 0.625rem 0.75rem;
+    font-family: var(--sentinel-cmd-font);
+    font-size: 0.75rem;
+    line-height: 1.55;
+    font-weight: 400;
+    font-feature-settings: "calt" 0, "liga" 0;
+    letter-spacing: -0.02em;
+    color: oklch(0.82 0.014 285);
+    box-shadow:
+      inset 0 1px 0 oklch(0.22 0.008 285 / 0.55),
+      inset 0 -1px 0 oklch(0 0 0 / 0.35);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    tab-size: 2;
+  }
+
+  .sentinel-command-snippet code {
+    font-family: var(--sentinel-cmd-font);
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+    font-feature-settings: inherit;
+    background: transparent;
+    color: inherit;
+  }
+
+  .sentinel-command-snippet code span[class^="sentinel-cmd-"] {
+    font-family: var(--sentinel-cmd-font);
+    font-size: inherit;
+    line-height: inherit;
+    letter-spacing: inherit;
+  }
+
+  .sentinel-command-snippet-wrap {
+    margin-top: 1rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid oklch(0.32 0.01 285 / 0.45);
+  }
+
+  /*
+   * Sintaxis estilo editor (TS/Python oscuro): keyword mint, strings/ids lila, puntuación apagada.
+   */
+  .sentinel-cmd-kw {
+    font-weight: 600;
+    color: oklch(0.72 0.1 168);
+  }
+
+  .sentinel-cmd-kw2 {
+    font-weight: 600;
+    color: oklch(0.68 0.095 172);
+  }
+
+  .sentinel-cmd-str {
+    font-weight: 500;
+    color: oklch(0.78 0.1 303);
+  }
+
+  .sentinel-cmd-id {
+    font-weight: 500;
+    color: oklch(0.76 0.11 292);
+  }
+
+  .sentinel-cmd-arg {
+    font-weight: 500;
+    color: oklch(0.74 0.105 295);
+  }
+
+  .sentinel-cmd-target {
+    font-weight: 500;
+    color: oklch(0.7 0.09 288);
+  }
+
+  .sentinel-cmd-muted {
+    font-weight: 400;
+    color: oklch(0.48 0.028 285);
+  }
+
+  .sentinel-cmd-num {
+    font-weight: 600;
+    color: oklch(0.74 0.09 195);
+  }
+
+  .sentinel-command-snippet.sentinel-command-snippet--syntax {
+    background: linear-gradient(
+      165deg,
+      oklch(0.058 0.006 285) 0%,
+      oklch(0.048 0.004 285) 100%
+    );
+    border-color: oklch(0.34 0.012 285 / 0.55);
+    box-shadow:
+      inset 0 1px 0 oklch(0.52 0.04 155 / 0.06),
+      inset 0 0 0 1px oklch(0.42 0.05 292 / 0.05),
+      inset 0 -1px 0 oklch(0 0 0 / 0.32);
+  }
+
+  /* Pizarra: campo de proceso oscuro (solo metáfora, sin brillo) */
+  .sentinel-board-canvas {
+    background-color: oklch(0.05 0.002 285);
+    background-image: radial-gradient(
+      ellipse 130% 90% at 50% 42%,
+      oklch(0.058 0.004 285) 0%,
+      oklch(0.051 0.003 285) 50%,
+      oklch(0.047 0.002 285) 100%
+    );
+  }
+
+  .dark .sentinel-board-pizarra {
+    background-image:
+      radial-gradient(ellipse 130% 90% at 50% 42%, oklch(0.058 0.004 285) 0%, transparent 58%),
+      linear-gradient(
+        0deg,
+        oklch(0.055 0.003 285 / 0.22) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        oklch(0.055 0.003 285 / 0.18) 1px,
+        transparent 1px
+      );
+    background-size:
+      100% 100%,
+      100% 28px,
+      28px 100%;
+    background-color: oklch(0.049 0.002 285);
+  }
+
+  /* Carril: contenedor del carril de proceso (encaja la columna) */
+  .sentinel-board-lane {
+    display: flex;
+    flex-direction: column;
+    padding: 0 3px 3px;
+    border-radius: 0.65rem;
+    background: linear-gradient(
+      180deg,
+      oklch(0.044 0.002 285) 0%,
+      oklch(0.04 0.002 285) 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px oklch(0.26 0.008 285 / 0.5),
+      inset 0 1px 0 oklch(0.32 0.01 285 / 0.12);
+  }
+
+  /* Columna dentro del carril: panel de proceso hundido */
+  .dark .sentinel-board-lane > div {
+    background: linear-gradient(
+      185deg,
+      oklch(0.074 0.004 285) 0%,
+      oklch(0.062 0.004 285) 52%,
+      oklch(0.058 0.003 285) 100%
+    );
+    border-color: oklch(0.34 0.012 285 / 0.55);
+    box-shadow:
+      inset 0 3px 10px oklch(0 0 0 / 0.42),
+      inset 0 1px 0 oklch(0.38 0.014 285 / 0.045),
+      0 1px 0 oklch(0.02 0 0 / 0.55);
+  }
+
+  .dark .sentinel-board-lane > div > div:first-child {
+    position: relative;
+    border-bottom-color: oklch(0.3 0.01 285 / 0.42);
+    background: linear-gradient(
+      180deg,
+      oklch(0.07 0.004 285) 0%,
+      oklch(0.063 0.004 285) 100%
+    );
+  }
+
+  .dark .sentinel-board-lane > div > div:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    border-radius: 0.5rem 0 0 0;
+    background: linear-gradient(
+      180deg,
+      oklch(0.42 0.045 283 / 0.14),
+      oklch(0.32 0.02 285 / 0.05)
+    );
+    pointer-events: none;
+  }
+
+  .dark .sentinel-board-lane > div [data-slot="scroll-area-viewport"] {
+    background: linear-gradient(
+      180deg,
+      oklch(0.064 0.003 285) 0%,
+      oklch(0.059 0.003 285) 100%
+    );
+  }
+
+  /* Estantería sutil: zona donde “apoyan” los tickets */
+  .dark .sentinel-board-lane [data-slot="scroll-area-viewport"] > div {
+    position: relative;
+    margin: 0 2px 2px;
+    border-radius: 0 0 0.45rem 0.45rem;
+    background: linear-gradient(
+      180deg,
+      oklch(0.056 0.003 285) 0%,
+      oklch(0.061 0.003 285) 55%,
+      oklch(0.058 0.003 285) 100%
+    );
+    box-shadow:
+      inset 0 3px 6px oklch(0 0 0 / 0.22),
+      inset 0 1px 0 oklch(0.36 0.01 285 / 0.06);
+  }
+
+  .sentinel-topbar {
+    box-shadow: inset 0 -1px 0 oklch(0.28 0.01 285 / 0.25);
+  }
+
+  .sentinel-filter-chip {
+    background: linear-gradient(
+      180deg,
+      oklch(0.14 0.005 285) 0%,
+      oklch(0.12 0.005 285) 100%
+    );
+    box-shadow: inset 0 1px 0 oklch(0.55 0.012 285 / 0.05);
+  }
+
+  /*
+   * Ticket: placa del flujo (no dashboard plano); perforación muy sutil arriba.
+   */
+  .sentinel-board-ticket:not(.sentinel-card-iridescent) {
+    border-radius: 0.42rem 0.52rem 0.48rem 0.48rem;
+  }
+
+  .sentinel-board-ticket:not(.sentinel-card-iridescent)::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    top: 0;
+    height: 1px;
+    background: repeating-linear-gradient(
+      90deg,
+      oklch(0.55 0.012 285 / 0.14) 0 3px,
+      transparent 3px 7px
+    );
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  .sentinel-board-ticket.sentinel-card-iridescent {
+    border-radius: 0.42rem 0.52rem 0.48rem 0.48rem;
+  }
+
+  /*
+   * Card: placa mate más clara y sólida que la columna;
+   * borde = humo/nieve muy suave (sin línea blanca dura);
+   * profundidad: sombra externa difusa + bisel interior casi imperceptible.
+   */
+  .sentinel-board-card:not(.sentinel-card-iridescent) {
+    background: linear-gradient(
+      172deg,
+      oklch(0.188 0.005 285) 0%,
+      oklch(0.162 0.005 285) 45%,
+      oklch(0.152 0.005 285) 100%
+    );
+    border-color: oklch(0.48 0.012 285 / 0.42);
+    transform: translateY(0);
+    box-shadow:
+      inset 0 1px 0 oklch(0.76 0.011 285 / 0.06),
+      inset 0 -1px 0 oklch(0 0 0 / 0.1),
+      0 2px 4px oklch(0 0 0 / 0.2),
+      0 8px 20px oklch(0 0 0 / 0.34),
+      0 0 0 1px oklch(0 0 0 / 0.18);
+  }
+
+  .sentinel-board-card:not(.sentinel-card-iridescent):hover {
+    border-color: oklch(0.54 0.014 285 / 0.46);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 oklch(0.8 0.012 285 / 0.07),
+      inset 0 -1px 0 oklch(0 0 0 / 0.12),
+      0 3px 6px oklch(0 0 0 / 0.22),
+      0 12px 28px oklch(0 0 0 / 0.4),
+      0 0 0 1px oklch(0 0 0 / 0.2);
+  }
+
+  /* Dock: segmentos y superficies elevadas (mate, borde humo) */
+  .sentinel-dock-segment {
+    background: linear-gradient(
+      180deg,
+      oklch(0.095 0.006 285) 0%,
+      oklch(0.078 0.006 285) 100%
+    );
+    border: 1px solid oklch(0.45 0.012 285 / 0.2);
+    box-shadow: inset 0 1px 0 oklch(0.55 0.014 285 / 0.05);
+  }
+
+  .sentinel-dock-segment-active {
+    background: linear-gradient(
+      180deg,
+      oklch(0.14 0.006 285) 0%,
+      oklch(0.12 0.005 285) 100%
+    );
+    box-shadow: inset 0 1px 0 oklch(0.65 0.015 285 / 0.07);
+  }
+
+  .sentinel-backlog-row {
+    border: 1px solid oklch(0.42 0.012 285 / 0.26);
+    background: linear-gradient(
+      165deg,
+      oklch(0.152 0.005 285) 0%,
+      oklch(0.124 0.005 285) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 oklch(0.66 0.015 285 / 0.055),
+      0 1px 0 oklch(0.02 0 0 / 0.28);
+  }
+
+  .sentinel-backlog-row:hover {
+    border-color: oklch(0.5 0.014 285 / 0.34);
+    box-shadow:
+      inset 0 1px 0 oklch(0.7 0.016 285 / 0.07),
+      0 1px 0 oklch(0.02 0 0 / 0.32);
+  }
+
+  .sentinel-analysis-rail {
+    border-left-width: 2px;
+    border-left-style: solid;
+    border-left-color: oklch(0.52 0.024 283 / 0.32);
+    background: linear-gradient(
+      90deg,
+      oklch(0.15 0.005 285 / 0.65) 0%,
+      oklch(0.13 0.005 285 / 0.4) 100%
+    );
   }
 }

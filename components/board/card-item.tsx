@@ -5,18 +5,22 @@ import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 
 const priorityConfig: Record<string, { classes: string; label: string }> = {
-  low: { classes: "bg-emerald-500/15 text-emerald-400", label: "Low" },
-  medium: { classes: "bg-amber-500/15 text-amber-400", label: "Med" },
-  high: { classes: "bg-orange-500/25 text-orange-200", label: "High" },
-  critical: { classes: "bg-red-500/25 text-red-200", label: "Crit" },
+  low: { classes: "border border-border/50 bg-muted/90 text-muted-foreground", label: "Low" },
+  medium: { classes: "border border-border/55 bg-muted text-foreground/75", label: "Med" },
+  high: {
+    classes:
+      "border border-[oklch(0.42_0.012_285/0.45)] bg-[oklch(0.2_0.008_285)] text-foreground/88",
+    label: "High",
+  },
+  critical: { classes: "border border-red-900/55 bg-red-950/45 text-red-200/85", label: "Crit" },
 };
 
 const statusDot: Record<ChecklistItemStatus, string> = {
-  pending: "bg-zinc-400",
-  in_progress: "bg-blue-400",
-  review: "bg-violet-400",
-  blocked: "bg-red-400",
-  done: "bg-emerald-400",
+  pending: "bg-foreground/22",
+  in_progress: "bg-foreground/32",
+  review: "bg-foreground/42",
+  blocked: "bg-red-700/85",
+  done: "bg-foreground/55",
 };
 
 interface CardItemProps {
@@ -40,7 +44,7 @@ function ChecklistSummary({ card }: { card: SentinelCard }) {
           />
         ))}
       </div>
-      <span className="text-[11px] tabular-nums text-muted-foreground">
+      <span className="text-[10px] tabular-nums text-muted-foreground">
         {doneCount}/{total}
       </span>
     </div>
@@ -65,27 +69,25 @@ export function CardItem({ card }: CardItemProps) {
         }
       }}
       className={cn(
-        "group relative flex cursor-pointer flex-col gap-2 rounded-lg border bg-card p-3 pl-3.5",
-        "transition-all duration-150 outline-none",
-        isSelected
-          ? "border-violet-500/40 ring-1 ring-violet-500/20"
-          : "border-border hover:border-border",
+        "sentinel-board-card sentinel-board-ticket group relative flex cursor-pointer flex-col gap-1.5 border p-2.5 pl-3",
+        "transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out outline-none",
+        isSelected && "sentinel-card-iridescent",
       )}
     >
       <span
         className={cn(
-          "absolute inset-y-0 left-0 w-[2px] rounded-l-lg transition-colors",
-          isSelected ? "bg-violet-500" : "bg-transparent group-hover:bg-violet-500/40",
+          "absolute inset-y-0 left-0 w-[2px] rounded-l-[0.42rem] transition-colors",
+          isSelected
+            ? "sentinel-card-accent-selected"
+            : "bg-transparent group-hover:bg-[oklch(0.62_0.02_285/0.11)]",
         )}
       />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[13px] font-medium leading-snug text-card-foreground">
-          {card.title}
-        </span>
+        <span className="sentinel-card-title min-w-0 flex-1">{card.title}</span>
         <span
           className={cn(
-            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide",
+            "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider",
             priority.classes,
           )}
         >
@@ -94,17 +96,17 @@ export function CardItem({ card }: CardItemProps) {
       </div>
 
       {card.description && (
-        <p className="text-xs leading-relaxed text-foreground/60 line-clamp-2">
+        <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2">
           {card.description}
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-0.5">
+      <div className="flex items-center justify-between gap-2 pt-0">
         <div className="flex flex-wrap gap-1">
           {card.tags.map((tag) => (
             <span
               key={tag}
-              className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+              className="rounded-md border border-border/30 bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-muted-foreground"
             >
               {tag}
             </span>
