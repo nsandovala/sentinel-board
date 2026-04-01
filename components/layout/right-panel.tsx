@@ -13,6 +13,7 @@ import type { DockEvent, EventType } from "@/types/event";
 import type { FocusSession } from "@/types/timer";
 import type { CardStatus } from "@/types/enums";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 
 const doneLike: CardStatus[] = ["listo", "produccion", "archivado"];
 
@@ -112,9 +113,19 @@ function DockCommandHighlighted({ command }: { command: string }) {
 }
 
 function DockCommandSnippetBlock({ command }: { command: string }) {
-  const copyCmd = useCallback(() => {
-    void navigator.clipboard?.writeText?.(command);
-  }, [command]);
+  const { toast } = useToast();
+
+  const copyCmd = useCallback(
+    async (e: React.MouseEvent) => {
+      try {
+        await navigator.clipboard.writeText(command);
+        toast("Comando copiado", "success", e);
+      } catch {
+        toast("Error al copiar comando", "error", e);
+      }
+    },
+    [command, toast],
+  );
 
   return (
     <div className="sentinel-command-snippet-host">

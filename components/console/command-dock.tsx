@@ -26,7 +26,13 @@ import { areTaskTitlesDuplicateOrSimilar } from "@/lib/console/local-analysis";
 import { mockSuggestions } from "@/lib/console/mock-events";
 import { createEvent } from "@/lib/state/sentinel-reducer";
 import { runLocalAnalysis, type LocalAnalysisResult } from "@/lib/console/local-analysis";
+import {
+  safeParseJSON,
+  normalizePlannerResponse,
+  plannerToLocalAnalysis,
+} from "@/lib/agents/parse-planner-response";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import type { SentinelCard } from "@/types/card";
@@ -99,13 +105,16 @@ function AnalysisPreview({
   projectId,
   projectName,
   onNotify,
+  isAgentResult,
 }: {
   data: LocalAnalysisResult;
   cards: SentinelCard[];
   projectId: string | null;
   projectName?: string;
   onNotify: (message: string) => void;
+  isAgentResult?: boolean;
 }) {
+  const { toast } = useToast();
   const cl = data.codexLoop;
   const loopFields: { label: string; value?: string }[] = [
     { label: "Problema", value: cl.problem },
@@ -123,9 +132,14 @@ function AnalysisPreview({
     dispatch({ type: "ADD_EVENT", event: createEvent("system", line) });
   };
 
-  const copyAll = () => {
-    void navigator.clipboard?.writeText?.(formatAnalysisExport(data));
-    onNotify("Informe copiado al portapapeles (resumen, tareas, riesgos, pasos, Codex).");
+  const copyAll = async (e: React.MouseEvent) => {
+    try {
+      await navigator.clipboard.writeText(formatAnalysisExport(data));
+      onNotify("Informe copiado al portapapeles (resumen, tareas, riesgos, pasos, Codex).");
+      toast("Informe copiado", "success", e);
+    } catch {
+      toast("Error al copiar", "error", e);
+    }
   };
 
   const addOne = (title: string) => {
@@ -183,10 +197,12 @@ function AnalysisPreview({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/30 pb-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/75">
-            Resultado · análisis local
+            Resultado · {isAgentResult ? "agente planner" : "heuristico local"}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            Sin LLM · revisá y ejecutá acciones abajo
+            {isAgentResult
+              ? "Respuesta via Ollama / OpenRouter · revisa y ejecuta acciones abajo"
+              : "Sin modelo · revisa y ejecuta acciones abajo"}
           </p>
         </div>
         <button
@@ -299,6 +315,8 @@ export function CommandDock() {
   const [createOpen, setCreateOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<LocalAnalysisResult | null>(null);
+  const [lastWasAgent, setLastWasAgent] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const state = useSentinel();
   const dispatch = useSentinelDispatch();
@@ -398,20 +416,84 @@ export function CommandDock() {
     setCommandValue("");
   }, [commandValue, runCommandLine]);
 
-  const handleAnalyzeSubmit = useCallback(() => {
+  const handleAnalyzeSubmit = useCallback(async () => {
     const text = analyzeValue.trim();
-    if (!text) return;
+    if (!text || analyzing) return;
+
+    setAnalyzing(true);
+    setExpanded(true);
+
+    try {
+      const res = await fetch("/api/agents/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent: "planner",
+          input: { task: text, context: "sentinel-board", constraints: "patch minimo" },
+        }),
+      });
+
+      const json = await res.json();
+
+      const tryNormalize = (data: unknown) => {
+        if (!data) return null;
+        return normalizePlannerResponse(data);
+      };
+
+      const planner =
+        tryNormalize(json.parsed) ??
+        (json.ok && json.rawText ? tryNormalize(safeParseJSON(json.rawText)) : null);
+
+      if (planner) {
+        const result = plannerToLocalAnalysis(planner, text);
+        setLastAnalysis(result);
+        setLastWasAgent(true);
+
+        const providerLabel =
+          json.provider === "ollama"
+            ? "Planner ejecutado con Ollama"
+            : json.provider === "openrouter"
+              ? "Planner ejecutado con OpenRouter"
+              : `Planner (${json.provider ?? "agente"})`;
+
+        dispatch({
+          type: "ADD_EVENT",
+          event: createEvent(
+            "heo_suggestion",
+            `${providerLabel} · ${result.sourcePreview || "contexto"}`,
+          ),
+        });
+        setAnalyzing(false);
+        return;
+      }
+
+      const errDetail = json.error || "Respuesta no estructurada";
+      dispatch({
+        type: "ADD_EVENT",
+        event: createEvent("system", `Agente planner: ${errDetail} — fallback heuristico activado.`),
+      });
+    } catch (err) {
+      dispatch({
+        type: "ADD_EVENT",
+        event: createEvent(
+          "system",
+          `Error de red al llamar planner: ${err instanceof Error ? err.message : "desconocido"} — fallback heuristico activado.`,
+        ),
+      });
+    }
+
     const result = runLocalAnalysis(text);
     setLastAnalysis(result);
-    setExpanded(true);
+    setLastWasAgent(false);
     dispatch({
       type: "ADD_EVENT",
       event: createEvent(
         "heo_suggestion",
-        `Análisis local · ${result.sourcePreview || "contexto"}`,
+        `Fallback heuristico activado · ${result.sourcePreview || "contexto"}`,
       ),
     });
-  }, [analyzeValue, dispatch]);
+    setAnalyzing(false);
+  }, [analyzeValue, analyzing, dispatch]);
 
   const handleFocusStart = useCallback(() => {
     dispatch({ type: "START_FOCUS" });
@@ -513,10 +595,10 @@ export function CommandDock() {
             <button
               type="button"
               onClick={handleAnalyzeSubmit}
-              disabled={!analyzeValue.trim()}
+              disabled={!analyzeValue.trim() || analyzing}
               className="sentinel-dock-segment mr-2 shrink-0 self-center rounded-md px-2.5 py-1 text-[11px] font-medium text-foreground/88 transition-colors hover:border-[oklch(0.5_0.014_285/0.28)] hover:shadow-[inset_0_1px_0_oklch(0.58_0.014_285/0.07)] disabled:opacity-40"
             >
-              Analizar
+              {analyzing ? "Analizando…" : "Analizar"}
             </button>
           )}
 
@@ -540,7 +622,15 @@ export function CommandDock() {
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <CommandLog />
               </div>
-              {lastAnalysis && dockMode === "analyze" && (
+              {analyzing && dockMode === "analyze" && (
+                <div className="flex items-center gap-2 border-t border-border/30 px-1 py-3">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground/70" />
+                  <span className="text-[11px] text-muted-foreground">
+                    Consultando agente planner…
+                  </span>
+                </div>
+              )}
+              {lastAnalysis && !analyzing && dockMode === "analyze" && (
                 <div className="max-h-[min(22rem,55vh)] shrink-0 overflow-y-auto border-t border-border/30 pt-2">
                   <AnalysisPreview
                     data={lastAnalysis}
@@ -548,6 +638,7 @@ export function CommandDock() {
                     projectId={defaultProjectId}
                     projectName={defaultProjectName}
                     onNotify={notify}
+                    isAgentResult={lastWasAgent}
                   />
                 </div>
               )}

@@ -1,0 +1,18 @@
+name: frontend-builder
+label: Frontend Builder
+purpose: Implementar UI funcional y wiring mínimo en sentinel-board.
+inputs:
+  - task
+  - files
+  - constraints
+outputs:
+  - files_to_touch
+  - patch_plan
+  - risks
+  - done_when
+mode: execution
+rules:
+  - No inventar backend
+  - No agregar dependencias sin necesidad
+  - Mantener cambios pequeños y reversibles
+  - No duplicar fuentes de datos

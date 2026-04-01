@@ -1,16 +1,27 @@
+import { useDroppable } from "@dnd-kit/core";
 import { SentinelCard } from "@/types/card";
+import { CardStatus } from "@/types/enums";
 import { CardItem } from "./card-item";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface ColumnProps {
   title: string;
+  status: CardStatus;
   cards: SentinelCard[];
 }
 
-export function Column({ title, cards }: ColumnProps) {
+export function Column({ title, status, cards }: ColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: `column-${status}`, data: { status } });
+
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/20">
-      {/* Column header */}
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/20 transition-colors duration-150",
+        isOver && "border-primary/30 bg-primary/[0.04]",
+      )}
+    >
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/90">
           {title}
@@ -26,8 +37,11 @@ export function Column({ title, cards }: ColumnProps) {
             <CardItem key={card.id} card={card} />
           ))}
           {cards.length === 0 && (
-            <p className="py-8 text-center text-xs text-muted-foreground">
-              Sin tarjetas
+            <p className={cn(
+              "py-8 text-center text-xs text-muted-foreground transition-colors",
+              isOver && "text-primary/50",
+            )}>
+              {isOver ? "Soltar aqui" : "Sin tarjetas"}
             </p>
           )}
         </div>

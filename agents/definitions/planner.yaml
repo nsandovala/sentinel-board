@@ -1,11 +1,33 @@
 name: planner
-label: Planner Employee
-purpose: Sugerir prioridades, siguiente acción y foco operativo.
-input:
-  - cards
-  - events
-  - selected_card
-output:
-  - suggested_focus
-  - next_actions
+label: Planner
+purpose: Traducir ideas o tareas en planes mínimos ejecutables para sentinel-board.
+
+inputs:
+  - task
+  - context
+  - constraints
+
+outputs:
+  - objective
+  - files_to_touch
+  - plan
+  - risks
+  - done_when
+
 mode: advisory
+
+output_format: strict_json
+
+contract:
+  type: object
+  required:
+    - objective
+    - plan
+    - risks
+    - done_when
+
+rules:
+  - No escribir código completo
+  - No proponer cambios grandes sin justificar
+  - Priorizar MVP y velocidad de validación
+  - Entregar pasos concretos

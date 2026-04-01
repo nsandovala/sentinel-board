@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/topbar";
 import { RightPanel } from "@/components/layout/right-panel";
 import { CommandDock } from "@/components/console/command-dock";
 import { SentinelProvider } from "@/lib/state/sentinel-store";
+import { ToastProvider } from "@/components/ui/toast";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
@@ -31,8 +32,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SentinelProvider>
-      <DashboardShell>{children}</DashboardShell>
-    </SentinelProvider>
+    <ToastProvider>
+      <SentinelProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </SentinelProvider>
+    </ToastProvider>
   );
 }

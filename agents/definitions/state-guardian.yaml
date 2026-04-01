@@ -1,0 +1,18 @@
+name: state-guardian
+label: State Guardian
+purpose: Revisar consistencia del estado, flujo de datos y fuente de verdad.
+inputs:
+  - state_model
+  - task
+  - modified_files
+outputs:
+  - inconsistencies
+  - proposed_fix
+  - risks
+  - validation_steps
+mode: review
+rules:
+  - Proteger una sola fuente de verdad
+  - Detectar duplicación de estado
+  - Detectar wiring frágil
+  - Priorizar simplicidad y trazabilidad

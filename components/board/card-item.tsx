@@ -1,5 +1,7 @@
 "use client";
 
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { SentinelCard, ChecklistItemStatus } from "@/types/card";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
@@ -25,6 +27,7 @@ const statusDot: Record<ChecklistItemStatus, string> = {
 
 interface CardItemProps {
   card: SentinelCard;
+  overlay?: boolean;
 }
 
 function ChecklistSummary({ card }: { card: SentinelCard }) {
@@ -51,29 +54,13 @@ function ChecklistSummary({ card }: { card: SentinelCard }) {
   );
 }
 
-export function CardItem({ card }: CardItemProps) {
-  const { selectedCardId } = useSentinel();
-  const dispatch = useSentinelDispatch();
-  const priority = priorityConfig[card.priority] ?? priorityConfig.medium;
-  const isSelected = selectedCardId === card.id;
-
+function CardContent({ card, isSelected, priority }: {
+  card: SentinelCard;
+  isSelected: boolean;
+  priority: { classes: string; label: string };
+}) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id })}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id });
-        }
-      }}
-      className={cn(
-        "sentinel-board-card sentinel-board-ticket group relative flex cursor-pointer flex-col gap-1.5 border p-2.5 pl-3",
-        "transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out outline-none",
-        isSelected && "sentinel-card-iridescent",
-      )}
-    >
+    <>
       <span
         className={cn(
           "absolute inset-y-0 left-0 w-[2px] rounded-l-[0.42rem] transition-colors",
@@ -114,6 +101,67 @@ export function CardItem({ card }: CardItemProps) {
         </div>
         <ChecklistSummary card={card} />
       </div>
+    </>
+  );
+}
+
+export function CardItemOverlay({ card }: { card: SentinelCard }) {
+  const priority = priorityConfig[card.priority] ?? priorityConfig.medium;
+  return (
+    <div
+      className={cn(
+        "sentinel-board-card sentinel-board-ticket group relative flex w-72 cursor-grabbing flex-col gap-1.5 border p-2.5 pl-3 opacity-90 shadow-xl ring-1 ring-primary/20",
+      )}
+    >
+      <CardContent card={card} isSelected={false} priority={priority} />
+    </div>
+  );
+}
+
+export function CardItem({ card }: CardItemProps) {
+  const { selectedCardId } = useSentinel();
+  const dispatch = useSentinelDispatch();
+  const priority = priorityConfig[card.priority] ?? priorityConfig.medium;
+  const isSelected = selectedCardId === card.id;
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: card.id,
+    data: { card },
+  });
+
+  const style = transform
+    ? { transform: CSS.Translate.toString(transform) }
+    : undefined;
+
+  const handleClick = () => {
+    if (!isDragging) {
+      dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id });
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id });
+        }
+      }}
+      className={cn(
+        "sentinel-board-card sentinel-board-ticket group relative flex cursor-grab flex-col gap-1.5 border p-2.5 pl-3",
+        "transition-[background-color,border-color,box-shadow] duration-200 ease-out outline-none",
+        isSelected && "sentinel-card-iridescent",
+        isDragging && "opacity-30",
+      )}
+    >
+      <CardContent card={card} isSelected={isSelected} priority={priority} />
     </div>
   );
 }

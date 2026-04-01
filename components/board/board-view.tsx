@@ -1,9 +1,20 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import { CardStatus } from "@/types/enums";
 import { SentinelCard } from "@/types/card";
 import { Column } from "./column";
+import { CardItemOverlay } from "./card-item";
 import {
   Terminal,
   Cpu,
@@ -98,7 +109,7 @@ function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelC
   };
 
   return (
-    <div className="sentinel-board-canvas flex h-full flex-col overflow-y-auto p-6">
+    <div className="flex h-full flex-col overflow-y-auto p-6">
       <h2 className="mb-4 text-sm font-semibold text-foreground">Timeline</h2>
       <p className="mb-3 text-xs text-muted-foreground">
         Clic en una fila con tarjeta citada abre el detalle en el board.
@@ -188,6 +199,36 @@ function BacklogView({ cards }: { cards: SentinelCard[] }) {
 
 export function BoardView() {
   const { cards, events, activeView, selectedProjectId, projects } = useSentinel();
+  const dispatch = useSentinelDispatch();
+  const [activeCard, setActiveCard] = useState<SentinelCard | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const card = (event.active.data.current as { card?: SentinelCard })?.card ?? null;
+      setActiveCard(card);
+    },
+    [],
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveCard(null);
+      const { active, over } = event;
+      if (!over) return;
+
+      const card = (active.data.current as { card?: SentinelCard })?.card;
+      const targetStatus = (over.data.current as { status?: CardStatus })?.status;
+
+      if (!card || !targetStatus || card.status === targetStatus) return;
+
+      dispatch({ type: "MOVE_CARD", cardId: card.id, status: targetStatus });
+    },
+    [dispatch],
+  );
 
   const visibleCards = filterCardsByProjectId(cards, selectedProjectId);
   const visibleEvents = filterEventsByProjectId(events, selectedProjectId, projects, cards);
@@ -198,12 +239,21 @@ export function BoardView() {
 
   const grouped = groupByStatus(visibleCards);
   return (
-    <div className="sentinel-board-canvas sentinel-board-pizarra relative isolate flex h-full gap-3 overflow-x-auto p-3">
-      {statusColumns.map(({ key, label }) => (
-        <div key={key} className="sentinel-board-lane shrink-0">
-          <Column title={label} cards={grouped[key]} />
-        </div>
-      ))}
-    </div>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="sentinel-board-canvas sentinel-board-pizarra relative isolate flex h-full gap-3 overflow-x-auto p-3">
+        {statusColumns.map(({ key, label }) => (
+          <div key={key} className="sentinel-board-lane shrink-0">
+            <Column title={label} status={key} cards={grouped[key]} />
+          </div>
+        ))}
+      </div>
+      <DragOverlay dropAnimation={null}>
+        {activeCard ? <CardItemOverlay card={activeCard} /> : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
