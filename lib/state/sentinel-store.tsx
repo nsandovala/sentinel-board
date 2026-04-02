@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useReducer,
   type Dispatch,
   type ReactNode,
@@ -33,6 +34,20 @@ const DispatchCtx = createContext<Dispatch<SentinelAction>>(() => {});
 
 export function SentinelProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(sentinelReducer, initialState);
+
+  useEffect(() => {
+    fetch("/api/tasks")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.ok && Array.isArray(json.tasks) && json.tasks.length > 0) {
+          dispatch({ type: "LOAD_AGENT_CARDS", cards: json.tasks });
+        }
+      })
+      .catch(() => {
+        // silently fall back to mock data
+      });
+  }, []);
+
   return (
     <StateCtx.Provider value={state}>
       <DispatchCtx.Provider value={dispatch}>{children}</DispatchCtx.Provider>

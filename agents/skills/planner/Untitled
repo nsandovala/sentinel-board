@@ -1,0 +1,24 @@
+Usa el agente planner.
+
+Lee estas reglas:
+[pegar SKILL.md de planner]
+
+Lee este prompt base:
+[pegar agents/prompts/planner.md]
+
+Tarea:
+Quiero mejorar el command dock para que cree tareas desde lenguaje humano simple.
+
+Contexto:
+- repo: sentinel-board
+- estado actual: board funcional, command dock ya visible
+- no quiero backend
+- debe seguir siendo MVP
+- quiero cambios pequeños
+
+Entrégame:
+1. objetivo
+2. archivos a tocar
+3. plan corto
+4. riesgos
+5. done_when

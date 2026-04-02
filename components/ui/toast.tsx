@@ -40,7 +40,7 @@ export function useToast() {
 
 function ToastItem({ entry, onDone }: { entry: ToastEntry; onDone: () => void }) {
   const [visible, setVisible] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -48,7 +48,9 @@ function ToastItem({ entry, onDone }: { entry: ToastEntry; onDone: () => void })
       setVisible(false);
       setTimeout(onDone, 180);
     }, DURATION_MS);
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [onDone]);
 
   const accent =

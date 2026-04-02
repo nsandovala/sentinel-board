@@ -24,6 +24,7 @@ export type SentinelAction =
   | { type: "SET_VIEW"; view: ActiveView }
   | { type: "MOVE_CARD"; cardId: string; status: CardStatus }
   | { type: "CREATE_CARD"; card: SentinelCard }
+  | { type: "LOAD_AGENT_CARDS"; cards: SentinelCard[] }
   | { type: "ADD_EVENT"; event: DockEvent }
   | { type: "START_FOCUS"; project?: string }
   | { type: "END_FOCUS" }
@@ -89,6 +90,20 @@ export function sentinelReducer(
             "command",
             `Tarea creada: "${action.card.title}" · ${projLabel}`,
           ),
+        ],
+      };
+    }
+
+    case "LOAD_AGENT_CARDS": {
+      const existingIds = new Set(state.cards.map((c) => c.id));
+      const newCards = action.cards.filter((c) => !existingIds.has(c.id));
+      if (newCards.length === 0) return state;
+      return {
+        ...state,
+        cards: [...state.cards, ...newCards],
+        events: [
+          ...state.events,
+          createEvent("system", `${newCards.length} tarea(s) cargadas desde amon-agents`),
         ],
       };
     }
