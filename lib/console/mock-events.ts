@@ -8,21 +8,21 @@ export const initialEvents: DockEvent[] = [
     timestamp: new Date(Date.now() - 3600_000),
   },
   {
-    id: "ev-2",
-    type: "command",
-    message: "\"Diseñar layout tipo IDE\" movido a → en_proceso",
+    id: "ev-4",
+    type: "system",
+    message: "Persistencia SQLite + Drizzle implementada (Etapa 1)",
     timestamp: new Date(Date.now() - 1800_000),
   },
   {
-    id: "ev-3",
-    type: "focus",
-    message: "Sesión de foco: 2h 15min en Sentinel Board",
+    id: "ev-6",
+    type: "command",
+    message: "TBB Bot v2.0 — MVP implementado: sync WhatsApp → Firebase",
     timestamp: new Date(Date.now() - 900_000),
   },
   {
-    id: "ev-4",
+    id: "ev-7",
     type: "heo_suggestion",
-    message: "HEO: Llevas 3 días sin mover \"Agregar proyecto TBB AMON Delivery\"",
+    message: 'HEO: "Test e2e TBB Bot" bloqueada — necesita credenciales Firebase',
     timestamp: new Date(Date.now() - 300_000),
   },
 ];
@@ -30,8 +30,8 @@ export const initialEvents: DockEvent[] = [
 export const mockSuggestions: HeoSuggestion[] = [
   {
     id: "sug-1",
-    text: "Mover AMON Delivery a prototipo funcional",
-    command: "mover amon delivery a prototipo funcional",
+    text: "Completar .env Firebase para TBB",
+    command: "mover completar .env a en proceso",
   },
   {
     id: "sug-2",
