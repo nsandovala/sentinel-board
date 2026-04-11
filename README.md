@@ -24,11 +24,12 @@ No es solo un Kanban — es una interfaz orientada a ejecucion donde ideas se co
 |------|-----------|
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Lenguaje | TypeScript strict |
+| Persistencia | SQLite + Drizzle ORM (local-first) |
 | Estilos | Tailwind CSS 4 + CSS custom properties |
 | Componentes | shadcn/ui + Radix primitives |
 | Drag & drop | @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities |
 | IA local | Ollama (primario) → OpenRouter (secundario) → heuristico (fallback) |
-| Estado | React Context + useReducer (fuente de verdad unica) |
+| Estado | React Context + useReducer (UI local) — DB como fuente de verdad |
 
 ## Arquitectura de agentes
 
@@ -106,7 +107,11 @@ npm install
 # Configurar variables de entorno
 cp .env.example .env.local  # o crear manualmente
 
-# Tener Ollama corriendo con un modelo
+# Crear tablas y poblar la DB con datos iniciales
+npm run db:push
+npm run db:seed
+
+# (Opcional) Tener Ollama corriendo con un modelo para IA
 ollama pull qwen2.5-coder:7b
 
 # Iniciar servidor de desarrollo
@@ -114,6 +119,49 @@ npm run dev
 ```
 
 Abrir [https://localhost:3000/board](https://localhost:3000/board)
+
+## Persistencia (SQLite + Drizzle)
+
+La DB vive en `data/sentinel.db` (SQLite, gitignored).
+
+### Scripts disponibles
+
+| Script | Que hace |
+|--------|----------|
+| `npm run db:push` | Crea/actualiza tablas segun el schema (`lib/db/schema.ts`) |
+| `npm run db:seed` | Puebla la DB con los datos mock iniciales |
+| `npm run db:studio` | Abre Drizzle Studio para inspeccionar la DB |
+
+### Schema (6 tablas)
+
+| Tabla | Descripcion |
+|-------|------------|
+| `projects` | Proyectos del board |
+| `tasks` | Cards/tareas con JSON para tags, codexLoop, fiveWhys, moneyCode |
+| `task_checklist_items` | Items de checklist por tarea (FK → tasks) |
+| `events` | Timeline de eventos |
+| `dock_commands` | Registro de comandos del dock (schema listo, wiring pendiente) |
+| `focus_sessions` | Sesiones de foco (schema listo, wiring pendiente) |
+
+### Flujo de datos
+
+```
+[Browser] → dispatch(CREATE_CARD) → reducer (UI local) + POST /api/tasks (DB)
+[Browser] → dispatch(MOVE_CARD)   → reducer (UI local) + PATCH /api/tasks/:id (DB)
+[Mount]   → fetch /api/tasks + /api/projects + /api/events → HYDRATE reducer
+[Fallback] → si DB vacia o error → mocks como antes
+```
+
+### API endpoints
+
+| Metodo | Ruta | Descripcion |
+|--------|------|------------|
+| GET | `/api/tasks` | Lista tareas con checklist desde DB |
+| POST | `/api/tasks` | Crea tarea + evento |
+| PATCH | `/api/tasks/:id` | Actualiza status, titulo, prioridad, etc. |
+| GET | `/api/projects` | Lista proyectos |
+| GET | `/api/events` | Lista eventos del timeline |
+| POST | `/api/events` | Registra evento |
 
 ## Estructura del proyecto
 
@@ -123,6 +171,10 @@ app/
     layout.tsx              → Shell: sidebar + topbar + panel + dock
     page.tsx                → Redirect a /board
     board/page.tsx          → Vista principal del board
+  api/tasks/route.ts        → GET + POST tareas (DB)
+  api/tasks/[id]/route.ts   → PATCH tarea
+  api/projects/route.ts     → GET proyectos (DB)
+  api/events/route.ts       → GET + POST eventos (DB)
   api/agents/run/route.ts   → Endpoint de agentes
 
 components/
@@ -149,6 +201,10 @@ components/
     button.tsx, card.tsx...  → shadcn/ui primitives
 
 lib/
+  db/
+    schema.ts               → Schema Drizzle (6 tablas)
+    index.ts                → Conexion SQLite singleton
+    seed.ts                 → Script de seed desde mocks
   ai/
     ai-router.ts            → Router Ollama → OpenRouter → fallback
   agents/
@@ -157,8 +213,8 @@ lib/
     build-agent-prompt.ts    → Constructor de prompts
     parse-planner-response.ts → Parser seguro de JSON
   state/
-    sentinel-store.tsx       → Provider + hooks (useSentinel, useSentinelDispatch)
-    sentinel-reducer.ts      → Reducer: MOVE_CARD, CREATE_CARD, SELECT_CARD, etc.
+    sentinel-store.tsx       → Provider + hooks + persistencia automatica
+    sentinel-reducer.ts      → Reducer: HYDRATE, MOVE_CARD, CREATE_CARD, etc.
   console/
     command-parser.ts        → Parser de comandos del dock
     command-executor.ts      → Ejecutor de comandos
@@ -189,10 +245,19 @@ types/
 - [x] Filtro por proyecto en sidebar
 - [x] Temporizador de foco integrado
 
-### Pendiente
+### Completado recientemente
 
-- [ ] Persistencia real (hoy es estado en memoria)
+- [x] Persistencia real con SQLite + Drizzle
+- [x] API CRUD para tasks (GET, POST, PATCH)
+- [x] Hydration del board desde DB al iniciar
+- [x] Mover/crear cards persiste en DB
+
+### Pendiente — Etapa 2
+
+- [ ] Ingesta real de amon-agents (pipeline DB, no filesystem)
+- [ ] Persistencia de dock commands y focus sessions (tablas listas, wiring pendiente)
 - [ ] Multiples agentes activos (qa-reviewer, state-guardian)
+- [ ] Edicion completa de cards (checklist, codexLoop, moneyCode via API)
 - [ ] Sorting dentro de columnas (drag intra-columna)
 - [ ] Touch support para drag & drop
 - [ ] Modo offline completo

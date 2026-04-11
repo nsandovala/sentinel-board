@@ -25,6 +25,7 @@ export type SentinelAction =
   | { type: "MOVE_CARD"; cardId: string; status: CardStatus }
   | { type: "CREATE_CARD"; card: SentinelCard }
   | { type: "LOAD_AGENT_CARDS"; cards: SentinelCard[] }
+  | { type: "HYDRATE"; cards: SentinelCard[]; projects?: Project[]; events?: DockEvent[] }
   | { type: "ADD_EVENT"; event: DockEvent }
   | { type: "START_FOCUS"; project?: string }
   | { type: "END_FOCUS" }
@@ -91,6 +92,15 @@ export function sentinelReducer(
             `Tarea creada: "${action.card.title}" · ${projLabel}`,
           ),
         ],
+      };
+    }
+
+    case "HYDRATE": {
+      return {
+        ...state,
+        cards: action.cards,
+        ...(action.projects ? { projects: action.projects } : {}),
+        ...(action.events ? { events: action.events } : {}),
       };
     }
 

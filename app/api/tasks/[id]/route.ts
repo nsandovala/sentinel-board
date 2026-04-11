@@ -1,29 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loadAgentOutput } from "@/lib/server/agent-outputs";
-import { projects as defaultProjects } from "@/lib/mock/projects";
+import { db } from "@/lib/db";
+import { tasks, events } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: NextRequest,
+interface PatchBody {
+  status?: string;
+  title?: string;
+  description?: string | null;
+  priority?: string;
+  type?: string;
+  tags?: string[];
+  blocked?: boolean;
+  blockerReason?: string | null;
+}
+
+export async function PATCH(
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-
   try {
-    const task = await loadAgentOutput(id, defaultProjects);
+    const { id } = await params;
+    const body = (await req.json()) as PatchBody;
 
-    if (!task) {
-      return NextResponse.json(
-        { ok: false, error: `Task ${id} not found` },
-        { status: 404 },
-      );
+    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, task });
+    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.title !== undefined) updates.title = body.title;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.priority !== undefined) updates.priority = body.priority;
+    if (body.type !== undefined) updates.type = body.type;
+    if (body.tags !== undefined) updates.tags = body.tags;
+    if (body.blocked !== undefined) updates.blocked = body.blocked;
+    if (body.blockerReason !== undefined) updates.blockerReason = body.blockerReason;
+
+    db.update(tasks).set(updates).where(eq(tasks.id, id)).run();
+
+    if (body.status && body.status !== existing.status) {
+      db.insert(events)
+        .values({
+          id: `ev-${Date.now()}`,
+          type: "command",
+          message: `"${existing.title}" → ${body.status}`,
+        })
+        .run();
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "Error leyendo output" },
+      { ok: false, error: err instanceof Error ? err.message : "DB update error" },
       { status: 500 },
     );
   }
