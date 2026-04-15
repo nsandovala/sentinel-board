@@ -4,6 +4,46 @@ Consola visual de operaciones para AMON Engineering OS.
 
 No es solo un Kanban — es una interfaz orientada a ejecucion donde ideas se convierten en trabajo estructurado, analizado y accionable.
 
+---
+
+## Quick Start (30 segundos)
+
+```bash
+git clone https://github.com/tu-usuario/sentinel-board.git
+cd sentinel-board
+npm install
+npm run db:push && npm run db:seed
+npm run dev
+```
+
+Abrir [http://localhost:3000/board](http://localhost:3000/board) — **funciona sin IA**.
+
+### Opciones de IA
+
+| Opcion | Costo | Setup |
+|--------|-------|-------|
+| **Sin IA** | $0 | Nada — fallback heurístico analiza texto localmente |
+| **Ollama** | $0 | `ollama pull qwen3:8b` y listo |
+| **OpenRouter** | Free tier / ~$0.001 | Crear cuenta → copiar API key → `.env.local` |
+| **Anthropic** | ~$0.001/análisis | Crear cuenta → copiar API key → `.env.local` |
+
+### Que funciona con cada opcion
+
+| Feature | Sin IA | Ollama | OpenRouter | Anthropic |
+|---------|--------|--------|------------|-----------|
+| Board kanban completo | ✅ | ✅ | ✅ | ✅ |
+| Drag & drop | ✅ | ✅ | ✅ | ✅ |
+| Command Dock | ✅ | ✅ | ✅ | ✅ |
+| Timeline | ✅ | ✅ | ✅ | ✅ |
+| Backlog inteligente (scoring) | ✅ | ✅ | ✅ | ✅ |
+| Análisis heurístico | ✅ | ✅ | ✅ | ✅ |
+| Análisis con agente IA | ❌ | ✅ | ✅ | ✅ |
+| Backlog analyzer (IA) | ❌ | ✅ | ✅ | ✅ |
+
+**TL;DR**: El board es 100% funcional offline. La IA es opcional y mejora el análisis de texto.
+
+---
+
 ## Que hace
 
 - **Board kanban** con 9 estados (idea bruta → produccion → archivado)
@@ -28,13 +68,13 @@ No es solo un Kanban — es una interfaz orientada a ejecucion donde ideas se co
 | Estilos | Tailwind CSS 4 + CSS custom properties |
 | Componentes | shadcn/ui + Radix primitives |
 | Drag & drop | @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities |
-| IA local | Ollama (primario) → OpenRouter (secundario) → heuristico (fallback) |
+| IA | Ollama → OpenRouter → Anthropic → fallback heurístico (100% offline) |
 | Estado | React Context + useReducer (UI local) — DB como fuente de verdad |
 
 ## Arquitectura de agentes
 
 ```
-lib/ai/ai-router.ts          → Router: Ollama → OpenRouter → heuristic
+lib/ai/ai-router.ts          → Router: Ollama → OpenRouter → Anthropic → heuristic
 lib/agents/run-agent.ts       → Orquestador: carga agente → prompt → routeAI
 lib/agents/load-agent.ts      → Registry de agentes (planner, frontend-builder, etc.)
 lib/agents/build-agent-prompt.ts → Construye system + user prompt con schema
@@ -49,7 +89,7 @@ app/api/agents/run/route.ts   → POST endpoint: { agent, input } → resultado
        ↓
 POST /api/agents/run { agent: "planner", input: { task, context, constraints } }
        ↓
-ai-router: Ollama (local) → OpenRouter (si hay key) → error
+ai-router: Ollama → OpenRouter → Anthropic → error
        ↓
 Si OK → parsear JSON → normalizar → mostrar resultado real
 Si falla → fallback heuristico local (sin red)
@@ -87,12 +127,18 @@ Acciones: crear tarjetas en board, copiar informe
 
 # Ollama (primario — defaults funcionan si Ollama corre local)
 OLLAMA_BASE_URL=http://localhost:11434   # opcional
-OLLAMA_MODEL=qwen2.5-coder:7b           # o cualquier modelo instalado
+OLLAMA_MODEL=qwen3:8b                    # o cualquier modelo instalado
 
-# OpenRouter (secundario — solo si quieres fallback en la nube)
-OPENROUTER_API_KEY=sk-or-...             # si no esta, se salta
-OPENROUTER_MODEL=qwen/qwen3-8b:free     # opcional
+# OpenRouter (secundario — solo si OPENROUTER_API_KEY esta definida)
+OPENROUTER_API_KEY=sk-or-...             # https://openrouter.ai/keys
+OPENROUTER_MODEL=qwen/qwen3-8b:free      # opcional, free tier disponible
+
+# Anthropic (terciario — solo si ANTHROPIC_API_KEY esta definida)
+ANTHROPIC_API_KEY=sk-ant-...             # https://console.anthropic.com/
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # ~$0.001 por análisis
 ```
+
+**Prioridad del router**: Ollama → OpenRouter → Anthropic → Fallback heurístico
 
 ## Setup
 
@@ -140,8 +186,8 @@ La DB vive en `data/sentinel.db` (SQLite, gitignored).
 | `tasks` | Cards/tareas con JSON para tags, codexLoop, fiveWhys, moneyCode |
 | `task_checklist_items` | Items de checklist por tarea (FK → tasks) |
 | `events` | Timeline de eventos |
-| `dock_commands` | Registro de comandos del dock (schema listo, wiring pendiente) |
-| `focus_sessions` | Sesiones de foco (schema listo, wiring pendiente) |
+| `dock_commands` | Registro de comandos del dock |
+| `focus_sessions` | Sesiones de foco |
 
 ### Flujo de datos
 
@@ -159,9 +205,13 @@ La DB vive en `data/sentinel.db` (SQLite, gitignored).
 | GET | `/api/tasks` | Lista tareas con checklist desde DB |
 | POST | `/api/tasks` | Crea tarea + evento |
 | PATCH | `/api/tasks/:id` | Actualiza status, titulo, prioridad, etc. |
+| DELETE | `/api/tasks/:id` | Elimina tarea + evento |
 | GET | `/api/projects` | Lista proyectos |
 | GET | `/api/events` | Lista eventos del timeline |
 | POST | `/api/events` | Registra evento |
+| GET/POST | `/api/dock-commands` | Registro de comandos del dock |
+| GET/POST | `/api/focus-sessions` | Sesiones de foco |
+| POST | `/api/agents/run` | Ejecuta agente IA |
 
 ## Estructura del proyecto
 
@@ -255,12 +305,11 @@ types/
 ### Pendiente — Etapa 2
 
 - [ ] Ingesta real de amon-agents (pipeline DB, no filesystem)
-- [ ] Persistencia de dock commands y focus sessions (tablas listas, wiring pendiente)
 - [ ] Multiples agentes activos (qa-reviewer, state-guardian)
 - [ ] Edicion completa de cards (checklist, codexLoop, moneyCode via API)
 - [ ] Sorting dentro de columnas (drag intra-columna)
 - [ ] Touch support para drag & drop
-- [ ] Modo offline completo
+- [ ] Modo offline completo (PWA)
 
 ## Licencia
 
