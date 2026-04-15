@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { Trash2 } from "lucide-react";
 import { SentinelCard, ChecklistItemStatus } from "@/types/card";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
@@ -123,6 +125,8 @@ export function CardItem({ card }: CardItemProps) {
   const dispatch = useSentinelDispatch();
   const priority = priorityConfig[card.priority] ?? priorityConfig.medium;
   const isSelected = selectedCardId === card.id;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -136,6 +140,25 @@ export function CardItem({ card }: CardItemProps) {
   const handleClick = () => {
     if (!isDragging) {
       dispatch({ type: "SELECT_CARD", cardId: isSelected ? null : card.id });
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 2500);
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/tasks/${card.id}`, { method: "DELETE" });
+      if (res.ok) {
+        dispatch({ type: "DELETE_CARD", cardId: card.id });
+      }
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
@@ -161,6 +184,22 @@ export function CardItem({ card }: CardItemProps) {
         isDragging && "opacity-30",
       )}
     >
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deleting}
+        title={confirmDelete ? "Click de nuevo para confirmar" : "Eliminar tarea"}
+        className={cn(
+          "absolute right-1.5 top-1.5 z-10 rounded p-1 transition-all",
+          "opacity-0 group-hover:opacity-100 focus:opacity-100",
+          confirmDelete
+            ? "bg-red-500/90 text-white hover:bg-red-600"
+            : "bg-muted/80 text-muted-foreground hover:bg-destructive/20 hover:text-destructive",
+          deleting && "pointer-events-none opacity-50",
+        )}
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
       <CardContent card={card} isSelected={isSelected} priority={priority} />
     </div>
   );

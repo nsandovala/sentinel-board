@@ -23,6 +23,7 @@ export type SentinelAction =
   | { type: "SELECT_PROJECT"; projectId: string | null }
   | { type: "SET_VIEW"; view: ActiveView }
   | { type: "MOVE_CARD"; cardId: string; status: CardStatus }
+  | { type: "DELETE_CARD"; cardId: string }
   | { type: "CREATE_CARD"; card: SentinelCard }
   | { type: "LOAD_AGENT_CARDS"; cards: SentinelCard[] }
   | { type: "HYDRATE"; cards: SentinelCard[]; projects?: Project[]; events?: DockEvent[] }
@@ -77,6 +78,19 @@ export function sentinelReducer(
         `"${card?.title ?? action.cardId}" → ${statusLabel}`,
       );
       return { ...state, cards, events: [...state.events, evt] };
+    }
+
+    case "DELETE_CARD": {
+      const card = state.cards.find((c) => c.id === action.cardId);
+      if (!card) return state;
+      const cards = state.cards.filter((c) => c.id !== action.cardId);
+      const evt = createEvent("command", `Tarea eliminada: "${card.title}"`);
+      return {
+        ...state,
+        cards,
+        selectedCardId: state.selectedCardId === action.cardId ? null : state.selectedCardId,
+        events: [...state.events, evt],
+      };
     }
 
     case "CREATE_CARD": {

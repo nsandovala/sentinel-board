@@ -5,6 +5,39 @@ import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: RouteContext,
+) {
+  try {
+    const { id } = await params;
+
+    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
+    }
+
+    db.delete(tasks).where(eq(tasks.id, id)).run();
+
+    db.insert(events)
+      .values({
+        id: `ev-${Date.now()}`,
+        type: "command",
+        message: `Tarea eliminada: "${existing.title}"`,
+      })
+      .run();
+
+    return NextResponse.json({ ok: true, deleted: { id, title: existing.title } });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "DB delete error" },
+      { status: 500 },
+    );
+  }
+}
+
 interface PatchBody {
   status?: string;
   title?: string;
