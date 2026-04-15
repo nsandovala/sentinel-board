@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import type { ActiveView } from "@/lib/state/sentinel-reducer";
+import { hasHighPriorityBacklogItems, highPriorityBacklogCount } from "@/lib/scoring/backlog-scorer";
 
 const views: { key: ActiveView; label: string }[] = [
   { key: "board", label: "Board" },
@@ -32,6 +33,9 @@ export function AppSidebar() {
     { label: "Revisión", value: review },
     { label: "Hechas", value: done },
   ];
+
+  const backlogHasHigh = hasHighPriorityBacklogItems(cards);
+  const backlogHighCount = highPriorityBacklogCount(cards);
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -115,7 +119,12 @@ export function AppSidebar() {
               {activeView === v.key && (
                 <span className="sentinel-nav-pip absolute left-0 top-1/2 h-3 w-[2px] -translate-y-1/2 rounded-r-full" />
               )}
-              {v.label}
+              <span className="flex-1">{v.label}</span>
+              {v.key === "backlog" && backlogHasHigh && (
+                <span className="ml-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {backlogHighCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>

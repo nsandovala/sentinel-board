@@ -57,4 +57,5 @@ export interface SentinelCard {
   moneyCode?: MoneyCodeData;
   blocked?: boolean;
   blockerReason?: string;
+  createdAt?: string;
 }

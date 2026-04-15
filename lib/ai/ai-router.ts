@@ -1,11 +1,12 @@
 /**
- * AI provider router: Ollama → OpenRouter → heuristic fallback.
+ * AI provider router: Ollama → OpenRouter → Anthropic → heuristic fallback.
  *
- * Each provider follows the OpenAI-compatible chat completions format,
- * so the same message payload works across all three.
+ * Each provider follows its native API format.
+ * Ollama/OpenRouter use OpenAI-compatible chat completions.
+ * Anthropic uses its Messages API.
  */
 
-export type AIProviderName = "ollama" | "openrouter" | "heuristic";
+export type AIProviderName = "ollama" | "openrouter" | "anthropic" | "heuristic";
 
 export interface AIRouterResult {
   ok: boolean;
@@ -98,6 +99,54 @@ async function callOpenRouter(messages: ChatMessage[]): Promise<AIRouterResult> 
   return { ok: true, provider: "openrouter", rawText };
 }
 
+async function callAnthropic(messages: ChatMessage[]): Promise<AIRouterResult> {
+  const key = getEnv("ANTHROPIC_API_KEY", "");
+  const model = getEnv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001");
+
+  const systemMessage = messages.find((m) => m.role === "system");
+  const userMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role, content: m.content }));
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system: systemMessage?.content ?? "",
+      messages: userMessages,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    return {
+      ok: false,
+      provider: "anthropic",
+      rawText: body,
+      error: `Anthropic ${res.status}: ${body.slice(0, 200)}`,
+    };
+  }
+
+  const json = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+  };
+
+  const textBlock = json.content?.find((c) => c.type === "text");
+  const rawText = textBlock?.text ?? "";
+
+  if (!rawText) {
+    return { ok: false, provider: "anthropic", rawText: "", error: "Anthropic: respuesta vacia" };
+  }
+
+  return { ok: true, provider: "anthropic", rawText };
+}
+
 const providers: ProviderConfig[] = [
   {
     name: "ollama",
@@ -108,6 +157,11 @@ const providers: ProviderConfig[] = [
     name: "openrouter",
     available: () => getEnv("OPENROUTER_API_KEY", "").length > 0,
     call: callOpenRouter,
+  },
+  {
+    name: "anthropic",
+    available: () => getEnv("ANTHROPIC_API_KEY", "").length > 0,
+    call: callAnthropic,
   },
 ];
 

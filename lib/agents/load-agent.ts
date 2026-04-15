@@ -67,6 +67,31 @@ const AGENTS: Record<string, AgentDefinition> = {
     mode: "advisory",
     output_format: "strict_json",
   },
+  "backlog-analyzer": {
+    name: "backlog-analyzer",
+    label: "Backlog Analyzer",
+    purpose:
+      "Analizar el backlog completo y sugerir qué 3 cards promover a en_proceso esta semana, basándose en el contexto del proyecto activo.",
+    inputs: ["cards", "activeProject", "allProjects"],
+    outputs: ["suggestions", "reasoning"],
+    mode: "advisory",
+    output_format: "strict_json",
+    contract: {
+      type: "object",
+      required: ["suggestions", "reasoning"],
+    },
+    rules: [
+      "Responder SOLO JSON válido, sin texto fuera del JSON",
+      "Siempre sugerir exactamente 3 cards (o menos si el backlog tiene menos)",
+      "Priorizar cards de proyectos activos sobre ideas huérfanas",
+      "Considerar el score ya calculado pero no depender solo de él",
+      "Las justificaciones deben ser concretas (1-2 oraciones)",
+      "Si una card está bloqueada, explicar si vale la pena desbloquearla",
+      "No sugerir cards muy recientes (<3 días) salvo urgencia real",
+      "Preferir variedad de proyectos si el usuario tiene varios activos",
+      "El reasoning final debe ser breve (2-3 oraciones máximo)",
+    ],
+  },
 };
 
 export function loadAgent(agentName: string): AgentDefinition {
