@@ -397,6 +397,20 @@ export function CommandDock() {
           : undefined,
       );
 
+      fetch("/api/dock-commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: outcome.parsed.action,
+          target: outcome.parsed.target ?? undefined,
+          project: outcome.parsed.project ?? undefined,
+          value: outcome.parsed.value ?? undefined,
+          raw: trimmed,
+          success: result.success,
+          resultMessage: result.message,
+        }),
+      }).catch(() => {});
+
       if (result.success) {
         dispatch({ type: "ADD_EVENT", event: createEvent("command", result.message) });
         return;
@@ -497,11 +511,22 @@ export function CommandDock() {
 
   const handleFocusStart = useCallback(() => {
     dispatch({ type: "START_FOCUS" });
+    fetch("/api/focus-sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "start" }),
+    }).catch(() => {});
   }, [dispatch]);
 
   const handleFocusEnd = useCallback(() => {
+    const elapsed = state.focusSession.elapsed;
     dispatch({ type: "END_FOCUS" });
-  }, [dispatch]);
+    fetch("/api/focus-sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "end", elapsedSeconds: elapsed }),
+    }).catch(() => {});
+  }, [dispatch, state.focusSession.elapsed]);
 
   const notify = useCallback(
     (message: string) => {
