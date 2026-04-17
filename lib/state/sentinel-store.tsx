@@ -39,6 +39,7 @@ const initialState: SentinelState = {
 
 const StateCtx = createContext<SentinelState>(initialState);
 const DispatchCtx = createContext<Dispatch<SentinelAction>>(() => {});
+const RefreshCtx = createContext<() => void>(() => {});
 
 async function hydrateFromDB(dispatch: Dispatch<SentinelAction>) {
   try {
@@ -153,13 +154,19 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     hydrateFromDB(rawDispatch);
   }, []);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
     <StateCtx.Provider value={state}>
-      <DispatchCtx.Provider value={dispatch}>{children}</DispatchCtx.Provider>
+      <DispatchCtx.Provider value={dispatch}>
+        <RefreshCtx.Provider value={refresh}>{children}</RefreshCtx.Provider>
+      </DispatchCtx.Provider>
     </StateCtx.Provider>
   );
 }
@@ -170,4 +177,8 @@ export function useSentinel() {
 
 export function useSentinelDispatch() {
   return useContext(DispatchCtx);
+}
+
+export function useSentinelRefresh() {
+  return useContext(RefreshCtx);
 }

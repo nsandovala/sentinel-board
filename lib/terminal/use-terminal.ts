@@ -45,7 +45,7 @@ const ANSI = {
   bold: "\x1b[1m",
 } as const;
 
-export function useTerminal() {
+export function useTerminal(onRefresh?: () => void) {
   const termRef = useRef<Terminal | null>(null);
   const [state, setState] = useState<TerminalState>({
     status: "idle",
@@ -121,7 +121,8 @@ export function useTerminal() {
           term.writeln(`${ANSI.dim}  ✓ ${providerLabel} · ${data.durationMs ?? 0}ms${ANSI.reset}`);
 
           if (data.hint === "refresh_board") {
-            term.writeln(`${ANSI.yellow}  ↻ Board actualizado — recargá para sincronizar UI${ANSI.reset}`);
+            term.writeln(`${ANSI.yellow}  ↻ Sincronizando board...${ANSI.reset}`);
+            onRefresh?.();
           }
 
           setState({ status: "success", provider: data.provider });

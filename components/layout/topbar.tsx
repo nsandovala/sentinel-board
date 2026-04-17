@@ -123,7 +123,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
                 ? "bg-primary/15 text-foreground ring-1 ring-primary/25"
                 : "bg-muted text-foreground/60 hover:bg-muted/90 hover:text-foreground",
             )}
-            title={showTerminal ? "Ocultar terminal" : "Mostrar terminal"}
+            title={showTerminal ? "Ocultar HEO Copilot" : "HEO Copilot"}
           >
             <Terminal className="h-3.5 w-3.5" />
           </button>

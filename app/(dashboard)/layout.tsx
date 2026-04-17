@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { RightPanel } from "@/components/layout/right-panel";
 import { CommandDock } from "@/components/console/command-dock";
-import { SentinelProvider } from "@/lib/state/sentinel-store";
+import { SentinelProvider, useSentinelRefresh } from "@/lib/state/sentinel-store";
 import { ToastProvider } from "@/components/ui/toast";
 import { useTerminal } from "@/lib/terminal/use-terminal";
 
@@ -17,7 +17,8 @@ const TerminalPanel = dynamic(
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const [showTerminal, setShowTerminal] = useState(false);
-  const { setTerminal, handle, state: terminalState } = useTerminal();
+  const refresh = useSentinelRefresh();
+  const { setTerminal, handle, state: terminalState } = useTerminal(refresh);
 
   const onTerminalReady = useCallback(
     (term: import("@xterm/xterm").Terminal) => {

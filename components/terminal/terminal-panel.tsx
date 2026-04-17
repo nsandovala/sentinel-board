@@ -37,9 +37,9 @@ interface TerminalPanelProps {
 }
 
 const statusConfig: Record<TerminalStatus, { label: string; classes: string }> = {
-  idle: { label: "Listo", classes: "text-muted-foreground/60" },
-  running: { label: "Ejecutando", classes: "text-amber-400/90" },
-  success: { label: "OK", classes: "text-emerald-400/90" },
+  idle: { label: "Ready", classes: "text-muted-foreground/60" },
+  running: { label: "HEO Thinking...", classes: "text-amber-400/90" },
+  success: { label: "Done", classes: "text-emerald-400/90" },
   error: { label: "Error", classes: "text-red-400/90" },
 };
 
@@ -96,8 +96,8 @@ export function TerminalPanel({
       term.open(containerRef.current!);
       fitAddon.fit();
 
-      term.writeln("\x1b[90m── Sentinel Terminal ──\x1b[0m");
-      term.writeln("\x1b[90mEscribí un comando abajo. Conectado a ai-router.\x1b[0m");
+      term.writeln("\x1b[90m── HEO Copilot ──\x1b[0m");
+      term.writeln("\x1b[90mAcciones locales + AI router. Escribí un comando abajo.\x1b[0m");
       term.writeln("");
 
       onTerminalReady?.(term);
@@ -139,8 +139,8 @@ export function TerminalPanel({
       {/* Header bar */}
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/15 px-3">
         <TermIcon className="h-3.5 w-3.5 text-muted-foreground/60" />
-        <span className="text-[11px] font-medium tracking-wide text-muted-foreground/80">
-          Terminal
+        <span className="text-[11px] font-semibold tracking-wide text-foreground/70">
+          HEO Copilot
         </span>
 
         <span className={cn("text-[10px] font-medium tracking-wide", statusInfo.classes)}>
@@ -193,7 +193,7 @@ export function TerminalPanel({
                 handleSubmit();
               }
             }}
-            placeholder={status === "running" ? "Esperando respuesta..." : "Escribí un comando..."}
+            placeholder={status === "running" ? "HEO Thinking..." : "Comando o pregunta..."}
             disabled={status === "running"}
             className="h-full flex-1 border-none bg-transparent text-[12px] text-foreground/90 placeholder:text-muted-foreground/40 focus:outline-none disabled:opacity-50"
             autoComplete="off"
