@@ -1,6 +1,7 @@
 import type { SentinelCard } from "@/types/card";
 import type { Project } from "@/types/project";
 import type { DockEvent } from "@/types/event";
+import type { CardComment } from "@/types/comment";
 import type { FocusSession } from "@/types/timer";
 import type { CardStatus } from "@/types/enums";
 import { STATUS_LABELS } from "@/lib/console/status-labels";
@@ -11,6 +12,8 @@ export interface SentinelState {
   projects: Project[];
   cards: SentinelCard[];
   events: DockEvent[];
+  cardComments: CardComment[];
+  cardCommentsFor: string | null;
   selectedCardId: string | null;
   /** null = sin filtro (comportamiento previo del board y vistas) */
   selectedProjectId: string | null;
@@ -25,9 +28,13 @@ export type SentinelAction =
   | { type: "MOVE_CARD"; cardId: string; status: CardStatus }
   | { type: "DELETE_CARD"; cardId: string }
   | { type: "CREATE_CARD"; card: SentinelCard }
+  | { type: "DELETE_CARD"; cardId: string }
+  | { type: "UPDATE_CARD"; cardId: string; updates: Partial<Omit<SentinelCard, "id">> }
   | { type: "LOAD_AGENT_CARDS"; cards: SentinelCard[] }
   | { type: "HYDRATE"; cards: SentinelCard[]; projects?: Project[]; events?: DockEvent[] }
   | { type: "ADD_EVENT"; event: DockEvent }
+  | { type: "SET_CARD_COMMENTS"; cardId: string; comments: CardComment[] }
+  | { type: "ADD_COMMENT"; comment: CardComment }
   | { type: "START_FOCUS"; project?: string }
   | { type: "END_FOCUS" }
   | { type: "TICK_FOCUS" };
@@ -109,6 +116,30 @@ export function sentinelReducer(
       };
     }
 
+    case "DELETE_CARD": {
+      const target = state.cards.find((c) => c.id === action.cardId);
+      if (!target) return state;
+      return {
+        ...state,
+        cards: state.cards.filter((c) => c.id !== action.cardId),
+        selectedCardId:
+          state.selectedCardId === action.cardId ? null : state.selectedCardId,
+        events: [
+          ...state.events,
+          createEvent("command", `Tarea eliminada: "${target.title}"`),
+        ],
+      };
+    }
+
+    case "UPDATE_CARD": {
+      const cardExists = state.cards.some((c) => c.id === action.cardId);
+      if (!cardExists) return state;
+      const cards = state.cards.map((c) =>
+        c.id === action.cardId ? { ...c, ...action.updates } : c,
+      );
+      return { ...state, cards };
+    }
+
     case "HYDRATE": {
       return {
         ...state,
@@ -134,6 +165,28 @@ export function sentinelReducer(
 
     case "ADD_EVENT":
       return { ...state, events: [...state.events, action.event] };
+
+    case "SET_CARD_COMMENTS":
+      return {
+        ...state,
+        cardComments: action.comments,
+        cardCommentsFor: action.cardId,
+      };
+
+    case "ADD_COMMENT": {
+      const comments =
+        state.cardCommentsFor === action.comment.cardId
+          ? [action.comment, ...state.cardComments]
+          : state.cardComments;
+      return {
+        ...state,
+        cardComments: comments,
+        events: [
+          ...state.events,
+          createEvent("system", `Comentario en "${state.cards.find((c) => c.id === action.comment.cardId)?.title ?? action.comment.cardId}"`),
+        ],
+      };
+    }
 
     case "START_FOCUS": {
       const label = action.project ? `Foco iniciado en ${action.project}` : "Foco iniciado";

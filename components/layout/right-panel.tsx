@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { Terminal, Cpu, Clock, Sparkles, Copy } from "lucide-react";
-import { useSentinel } from "@/lib/state/sentinel-store";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Terminal, Cpu, Clock, Sparkles, Copy, Trash2, MessageSquare, Send } from "lucide-react";
+import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import type { CommentType } from "@/types/comment";
 import { eventRelatesToProject } from "@/lib/state/sentinel-reducer";
 import { generateCodexLoop } from "@/lib/console/codex-loop-generator";
 import { generateMoneyCode } from "@/lib/console/money-code-generator";
@@ -571,6 +572,156 @@ function EmptyState() {
   );
 }
 
+const commentTypeBadge: Record<CommentType, { label: string; classes: string }> = {
+  comment: { label: "Comentario", classes: "bg-muted/70 text-muted-foreground" },
+  decision: { label: "Decisión", classes: "bg-amber-950/50 text-amber-300/90" },
+  system: { label: "Sistema", classes: "bg-blue-950/40 text-blue-300/80" },
+  agent: { label: "Agente", classes: "bg-violet-950/40 text-violet-300/80" },
+};
+
+function CardCommentsSection({ cardId }: { cardId: string }) {
+  const { cardComments, cardCommentsFor } = useSentinel();
+  const dispatch = useSentinelDispatch();
+  const [body, setBody] = useState("");
+  const [commentType, setCommentType] = useState<CommentType>("comment");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const comments = cardCommentsFor === cardId ? cardComments : [];
+
+  const handleSubmit = () => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    dispatch({
+      type: "ADD_COMMENT",
+      comment: {
+        id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        cardId,
+        author: "user",
+        body: trimmed,
+        type: commentType,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    setBody("");
+    setCommentType("comment");
+    inputRef.current?.focus();
+  };
+
+  return (
+    <section>
+      <div className="mb-2.5 flex items-center gap-2">
+        <MessageSquare className="h-3.5 w-3.5 text-primary/40" />
+        <h3 className="sentinel-rail-section-label">Actividad</h3>
+        {comments.length > 0 && (
+          <span className="text-[10px] tabular-nums text-muted-foreground">{comments.length}</span>
+        )}
+      </div>
+
+      <div className="sentinel-glass-panel p-3">
+        <div className="mb-3 flex gap-1.5">
+          <textarea
+            ref={inputRef}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Agregar comentario..."
+            rows={2}
+            className="flex-1 resize-none rounded-md border border-border/30 bg-background/50 px-2.5 py-1.5 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:border-primary/30 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!body.trim()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-md border border-border/30 bg-muted/50 text-muted-foreground transition-colors hover:bg-primary/15 hover:text-foreground disabled:opacity-30"
+          >
+            <Send className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="mb-3 flex gap-1">
+          {(Object.keys(commentTypeBadge) as CommentType[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setCommentType(t)}
+              className={cn(
+                "rounded-md border px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide transition-colors",
+                commentType === t
+                  ? "border-primary/30 bg-primary/10 text-foreground/80"
+                  : "border-border/20 bg-transparent text-muted-foreground/60 hover:text-muted-foreground",
+              )}
+            >
+              {commentTypeBadge[t].label}
+            </button>
+          ))}
+        </div>
+
+        {comments.length === 0 ? (
+          <p className="py-2 text-center text-[10px] text-muted-foreground/60">
+            Sin actividad registrada
+          </p>
+        ) : (
+          <div className="flex max-h-52 flex-col gap-2 overflow-y-auto">
+            {comments.map((c) => {
+              const badge = commentTypeBadge[c.type] ?? commentTypeBadge.comment;
+              const time = new Date(c.createdAt);
+              return (
+                <div key={c.id} className="rounded-md border border-border/15 bg-background/30 px-2.5 py-2">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-[10px] font-medium text-foreground/75">{c.author}</span>
+                    <span className={cn("rounded px-1 py-px text-[8px] font-semibold uppercase tracking-wider", badge.classes)}>
+                      {badge.label}
+                    </span>
+                    <span className="ml-auto text-[9px] tabular-nums text-muted-foreground/50">
+                      {time.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}{" "}
+                      {time.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground/80">{c.body}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DeleteCardButton({ cardId }: { cardId: string }) {
+  const dispatch = useSentinelDispatch();
+  const [confirming, setConfirming] = useState(false);
+
+  const handleDelete = () => {
+    if (confirming) {
+      dispatch({ type: "DELETE_CARD", cardId });
+    } else {
+      setConfirming(true);
+      setTimeout(() => setConfirming(false), 3000);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleDelete}
+      className={cn(
+        "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-wide transition-colors",
+        confirming
+          ? "border-red-700/50 bg-red-950/60 text-red-300 hover:bg-red-900/60"
+          : "border-border/30 bg-muted/50 text-muted-foreground hover:border-red-800/40 hover:bg-red-950/40 hover:text-red-300",
+      )}
+    >
+      <Trash2 className="h-3 w-3" />
+      {confirming ? "Confirmar" : "Eliminar"}
+    </button>
+  );
+}
+
 export function RightPanel() {
   const { cards, projects, selectedCardId, selectedProjectId, events, focusSession } =
     useSentinel();
@@ -632,6 +783,9 @@ export function RightPanel() {
                 {card.blockerReason ? ` — ${card.blockerReason}` : ""}
               </p>
             )}
+            <div className="mt-2.5 flex gap-2">
+              <DeleteCardButton cardId={card.id} />
+            </div>
           </div>
 
           {card.description && (
@@ -666,6 +820,8 @@ export function RightPanel() {
               </p>
             </div>
           )}
+
+          <CardCommentsSection cardId={card.id} />
 
           <SuggestedNextActionSection card={card} projectName={project?.name} />
 

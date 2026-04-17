@@ -31,6 +31,7 @@ function assembleCard(
     moneyCode: (row.moneyCode as unknown as SentinelCard["moneyCode"]) ?? undefined,
     blocked: row.blocked,
     blockerReason: row.blockerReason ?? undefined,
+    createdAt: row.createdAt,
   };
 }
 

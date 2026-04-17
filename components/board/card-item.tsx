@@ -32,6 +32,19 @@ interface CardItemProps {
   overlay?: boolean;
 }
 
+function formatShortDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const day = d.getDate();
+    const month = d.toLocaleDateString("es-MX", { month: "short" });
+    const hh = d.getHours().toString().padStart(2, "0");
+    const mm = d.getMinutes().toString().padStart(2, "0");
+    return `${day} ${month} · ${hh}:${mm}`;
+  } catch {
+    return "";
+  }
+}
+
 function ChecklistSummary({ card }: { card: SentinelCard }) {
   if (card.checklist.length === 0) return null;
 
@@ -91,7 +104,7 @@ function CardContent({ card, isSelected, priority }: {
       )}
 
       <div className="flex items-center justify-between gap-2 pt-0">
-        <div className="flex flex-wrap gap-1">
+        <div className="flex items-center gap-1.5">
           {card.tags.map((tag) => (
             <span
               key={tag}
@@ -100,6 +113,11 @@ function CardContent({ card, isSelected, priority }: {
               {tag}
             </span>
           ))}
+          {card.createdAt && (
+            <span className="text-[9px] tabular-nums text-muted-foreground/45">
+              {formatShortDate(card.createdAt)}
+            </span>
+          )}
         </div>
         <ChecklistSummary card={card} />
       </div>

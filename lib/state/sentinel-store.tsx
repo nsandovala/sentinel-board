@@ -20,6 +20,7 @@ import {
   type SentinelAction,
 } from "./sentinel-reducer";
 import type { SentinelCard } from "@/types/card";
+import type { CardComment } from "@/types/comment";
 import type { DockEvent } from "@/types/event";
 import type { Project } from "@/types/project";
 import type { CardStatus } from "@/types/enums";
@@ -28,6 +29,8 @@ const initialState: SentinelState = {
   projects: mockProjects,
   cards: mockCards,
   events: initialEvents,
+  cardComments: [],
+  cardCommentsFor: null,
   selectedCardId: null,
   selectedProjectId: null,
   activeView: "board",
@@ -87,6 +90,40 @@ function persistCreateCard(card: SentinelCard) {
   }).catch(() => {});
 }
 
+function persistDeleteCard(cardId: string) {
+  fetch(`/api/tasks/${cardId}`, { method: "DELETE" }).catch(() => {});
+}
+
+function persistUpdateCard(cardId: string, updates: Partial<Omit<SentinelCard, "id">>) {
+  fetch(`/api/tasks/${cardId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  }).catch(() => {});
+}
+
+function persistComment(comment: CardComment) {
+  fetch(`/api/tasks/${comment.cardId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(comment),
+  }).catch(() => {});
+}
+
+async function loadCardComments(
+  cardId: string,
+  dispatch: Dispatch<SentinelAction>,
+) {
+  try {
+    const res = await fetch(`/api/tasks/${cardId}/comments`).then((r) => r.json());
+    if (res.ok && Array.isArray(res.comments)) {
+      dispatch({ type: "SET_CARD_COMMENTS", cardId, comments: res.comments });
+    }
+  } catch {
+    dispatch({ type: "SET_CARD_COMMENTS", cardId, comments: [] });
+  }
+}
+
 export function SentinelProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(sentinelReducer, initialState);
 
@@ -99,6 +136,18 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
       }
       if (action.type === "CREATE_CARD") {
         persistCreateCard(action.card);
+      }
+      if (action.type === "DELETE_CARD") {
+        persistDeleteCard(action.cardId);
+      }
+      if (action.type === "UPDATE_CARD") {
+        persistUpdateCard(action.cardId, action.updates);
+      }
+      if (action.type === "ADD_COMMENT") {
+        persistComment(action.comment);
+      }
+      if (action.type === "SELECT_CARD" && action.cardId) {
+        loadCardComments(action.cardId, rawDispatch);
       }
     },
     [],

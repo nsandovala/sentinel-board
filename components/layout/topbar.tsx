@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 
@@ -10,7 +10,12 @@ const viewLabels: Record<string, string> = {
   backlog: "Backlog",
 };
 
-export function TopBar() {
+interface TopBarProps {
+  showTerminal?: boolean;
+  onToggleTerminal?: () => void;
+}
+
+export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
   const { activeView, selectedProjectId, projects } = useSentinel();
   const dispatch = useSentinelDispatch();
 
@@ -107,6 +112,22 @@ export function TopBar() {
           </svg>
           Filtrar
         </div>
+
+        {onToggleTerminal && (
+          <button
+            type="button"
+            onClick={onToggleTerminal}
+            className={cn(
+              "flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border/40 transition-colors",
+              showTerminal
+                ? "bg-primary/15 text-foreground ring-1 ring-primary/25"
+                : "bg-muted text-foreground/60 hover:bg-muted/90 hover:text-foreground",
+            )}
+            title={showTerminal ? "Ocultar terminal" : "Mostrar terminal"}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+          </button>
+        )}
 
         <div className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border/40 bg-muted text-foreground/80 transition-colors hover:bg-muted/90 hover:text-foreground">
           <svg

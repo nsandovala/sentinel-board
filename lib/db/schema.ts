@@ -59,6 +59,25 @@ export const taskChecklistItems = sqliteTable("task_checklist_items", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+// ── Card comments ──────────────────────────────────────────────────────────
+
+export const cardComments = sqliteTable("card_comments", {
+  id: text("id").primaryKey(),
+  cardId: text("card_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  author: text("author").notNull().default("user"),
+  body: text("body").notNull(),
+  type: text("type", {
+    enum: ["comment", "decision", "system", "agent"],
+  })
+    .notNull()
+    .default("comment"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 // ── Events (timeline) ───────────────────────────────────────────────────────
 
 export const events = sqliteTable("events", {
