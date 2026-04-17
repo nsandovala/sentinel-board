@@ -1,315 +1,336 @@
 # Sentinel Board
 
-Consola visual de operaciones para AMON Engineering OS.
+> Workspace vivo de operaciones para ingenieria de software. No es un kanban -- es una interfaz de ejecucion donde ideas se convierten en trabajo estructurado, analizado y accionable.
 
-No es solo un Kanban — es una interfaz orientada a ejecucion donde ideas se convierten en trabajo estructurado, analizado y accionable.
+![Sentinel Board](docs/screenshots/board-overview.png)
 
 ---
 
-## Quick Start (30 segundos)
+## Por que Sentinel Board
+
+| Problema | Sentinel Board |
+|----------|---------------|
+| Los kanbans son pasivos | Cards con acciones reales: eliminar, mover, comentar desde terminal |
+| El analisis vive fuera del board | Pegar texto -> analisis estructurado -> cards en el board, todo en un flujo |
+| La IA reemplaza al usuario | La IA es opcional. El sistema completo funciona offline sin providers |
+| El estado se pierde al recargar | SQLite local-first. Persistencia real en cada accion |
+
+---
+
+## Quick Start
 
 ```bash
-git clone https://github.com/tu-usuario/sentinel-board.git
+git clone https://github.com/nsandovala/sentinel-board.git
 cd sentinel-board
 npm install
 npm run db:push && npm run db:seed
 npm run dev
 ```
 
-Abrir [http://localhost:3000/board](http://localhost:3000/board) — **funciona sin IA**.
+Abrir [https://localhost:3000/board](https://localhost:3000/board) -- funciona sin IA.
 
-### Opciones de IA
+### Providers de IA (opcionales)
 
-| Opcion | Costo | Setup |
-|--------|-------|-------|
-| **Sin IA** | $0 | Nada — fallback heurístico analiza texto localmente |
-| **Ollama** | $0 | `ollama pull qwen3:8b` y listo |
-| **OpenRouter** | Free tier / ~$0.001 | Crear cuenta → copiar API key → `.env.local` |
-| **Anthropic** | ~$0.001/análisis | Crear cuenta → copiar API key → `.env.local` |
+| Provider | Costo | Setup |
+|----------|-------|-------|
+| Sin IA | $0 | Nada. Fallback heuristico analiza texto localmente |
+| Ollama | $0 | `ollama pull qwen3:8b` y listo |
+| OpenRouter | Free tier | Crear cuenta en [openrouter.ai](https://openrouter.ai) -> copiar API key |
+| Anthropic | ~$0.001/req | Crear cuenta en [console.anthropic.com](https://console.anthropic.com) -> copiar API key |
 
-### Que funciona con cada opcion
+```bash
+# .env.local (todos opcionales)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:8b
+OPENROUTER_API_KEY=sk-or-...
+ANTHROPIC_API_KEY=sk-ant-...
+```
 
-| Feature | Sin IA | Ollama | OpenRouter | Anthropic |
-|---------|--------|--------|------------|-----------|
-| Board kanban completo | ✅ | ✅ | ✅ | ✅ |
-| Drag & drop | ✅ | ✅ | ✅ | ✅ |
-| Command Dock | ✅ | ✅ | ✅ | ✅ |
-| Timeline | ✅ | ✅ | ✅ | ✅ |
-| Backlog inteligente (scoring) | ✅ | ✅ | ✅ | ✅ |
-| Análisis heurístico | ✅ | ✅ | ✅ | ✅ |
-| Análisis con agente IA | ❌ | ✅ | ✅ | ✅ |
-| Backlog analyzer (IA) | ❌ | ✅ | ✅ | ✅ |
-
-**TL;DR**: El board es 100% funcional offline. La IA es opcional y mejora el análisis de texto.
+**Prioridad del router**: Ollama -> OpenRouter -> Anthropic -> Fallback heuristico
 
 ---
 
-## Que hace
+## Features
 
-- **Board kanban** con 9 estados (idea bruta → produccion → archivado)
-- **Drag & drop** real entre columnas con `@dnd-kit/core`
-- **Command Dock** — consola inferior con dos modos:
-  - **Comando**: crear tareas, mover cards, iniciar foco, registrar tiempo
-  - **Analizar**: pegar texto libre → analisis estructurado con agente IA
-- **Panel derecho** — Codex Loop, Codigo del Dinero, siguiente accion sugerida
-- **Timeline** — registro cronologico de toda accion ejecutada
-- **Backlog** — vista filtrada de ideas brutas y tareas bloqueadas
-- **Proyectos** — filtro lateral que segmenta board, timeline y panel
-- **Toast contextual** — feedback visual al copiar informes y comandos
-- **Foco** — temporizador integrado con registro automatico
+### Board Kanban (9 estados)
+
+Drag & drop real entre columnas. 9 estados de flujo: Idea bruta -> Clarificando -> Validando -> En proceso -> Desarrollo -> QA -> Listo -> Produccion -> Archivado.
+
+Cards con prioridad, tipo, tags, checklist, timestamps, y boton de eliminar con confirmacion.
+
+![Board con columnas y cards](docs/screenshots/board-terminal.png)
+
+### HEO Copilot (Terminal)
+
+Terminal operativa con acciones reales sobre el sistema. Los comandos locales se ejecutan contra la BD sin pasar por el LLM.
+
+![HEO Copilot ejecutando acciones locales](docs/screenshots/heo-copilot.png)
+
+| Comando | Tipo | Que hace |
+|---------|------|----------|
+| `lista las 3 prioridades mas altas` | `[ACTION]` | Lee cards reales de la BD, ordena por prioridad |
+| `mueve Ingesta real de amon-agents a clarificando` | `[ACTION]` | Actualiza status en BD, refresca board automaticamente |
+| `que hora es` | `[ACTION]` | Hora real del sistema |
+| Cualquier otro comando | `[TEXT]`/`[JSON]` | Se envia al LLM via ai-router |
+
+Soporta lenguaje natural sin comillas: `pasa`, `manda`, `lleva`, `pon`, `cambia` -- todos funcionan como verbos de movimiento.
+
+Cuando Ollama u otro provider esta disponible, responde preguntas libres:
+
+![Respuesta de Ollama en terminal](docs/screenshots/ollama-response.png)
+
+### Command Dock
+
+Panel inferior con dos modos:
+
+- **COMANDO**: Crear tareas, mover cards, iniciar foco, registrar tiempo
+- **ANALIZAR**: Pegar texto libre -> analisis estructurado con agente IA -> crear cards en el board
+
+![Dock expandido con registro y acciones rapidas](docs/screenshots/dock-expanded.png)
+
+### Planner (Analisis con IA)
+
+Pega cualquier texto, pregunta o contexto en la pestana ANALIZAR. El agente planner devuelve: resumen ejecutivo, proximos pasos, tareas propuestas para el backlog, riesgos, y un Codex Loop completo.
+
+![Resultado del planner con tareas y riesgos](docs/screenshots/planner-analysis.png)
+
+### Panel Derecho (Detalle HEO)
+
+Al seleccionar una card: Codex Loop (6 pasos), Codigo del Dinero (scoring multidimensional), siguiente accion sugerida con comando copiable, y seccion de comentarios.
+
+![Panel derecho con Codex Loop y comando sugerido](docs/screenshots/codex-loop-panel.png)
+
+### Comentarios por Card
+
+4 tipos de comentario: comentario, decision, sistema, agente. Se cargan on-demand al seleccionar una card y persisten en SQLite.
+
+![Seccion de actividad y comentarios](docs/screenshots/comments-activity.png)
+
+### Backlog Inteligente
+
+Vista filtrada de ideas brutas y tareas bloqueadas, ordenadas por scoring de prioridad. Incluye analizador de backlog con IA.
+
+![Backlog con scoring y analisis](docs/screenshots/backlog-scoring.png)
+
+### Drag & Drop
+
+Arrastrar cards entre columnas con feedback visual. Persistencia automatica via PATCH.
+
+![Card siendo arrastrada entre columnas](docs/screenshots/drag-drop.png)
+
+### Mas
+
+- **Timeline**: Registro cronologico de toda accion ejecutada
+- **Proyectos**: Filtro lateral que segmenta board, timeline y panel (5 proyectos en la sidebar)
+- **Foco**: Temporizador integrado con registro automatico
+- **Toast contextual**: Feedback visual al copiar informes y comandos
+
+---
 
 ## Stack
 
 | Capa | Tecnologia |
 |------|-----------|
-| Framework | Next.js 16 (App Router, Turbopack) |
+| Framework | Next.js 16.1.7 (App Router, Turbopack, React Compiler) |
 | Lenguaje | TypeScript strict |
+| UI | React 19 + shadcn/ui + Radix primitives |
+| Estilos | Tailwind CSS 4 + CSS custom properties (OKLCH) |
 | Persistencia | SQLite + Drizzle ORM (local-first) |
-| Estilos | Tailwind CSS 4 + CSS custom properties |
-| Componentes | shadcn/ui + Radix primitives |
-| Drag & drop | @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities |
-| IA | Ollama → OpenRouter → Anthropic → fallback heurístico (100% offline) |
-| Estado | React Context + useReducer (UI local) — DB como fuente de verdad |
+| Drag & drop | @dnd-kit/core + @dnd-kit/utilities |
+| Terminal | xterm.js + addon-fit |
+| IA | Ollama -> OpenRouter -> Anthropic -> fallback heuristico |
+| Estado | React Context + useReducer (UI) / SQLite (verdad) |
 
-## Arquitectura de agentes
+---
 
-```
-lib/ai/ai-router.ts          → Router: Ollama → OpenRouter → Anthropic → heuristic
-lib/agents/run-agent.ts       → Orquestador: carga agente → prompt → routeAI
-lib/agents/load-agent.ts      → Registry de agentes (planner, frontend-builder, etc.)
-lib/agents/build-agent-prompt.ts → Construye system + user prompt con schema
-lib/agents/parse-planner-response.ts → Safe JSON parser + normalizador
-app/api/agents/run/route.ts   → POST endpoint: { agent, input } → resultado
-```
-
-### Flujo de analisis
+## Arquitectura
 
 ```
-[Usuario escribe texto] → click Analizar
-       ↓
-POST /api/agents/run { agent: "planner", input: { task, context, constraints } }
-       ↓
-ai-router: Ollama → OpenRouter → Anthropic → error
-       ↓
-Si OK → parsear JSON → normalizar → mostrar resultado real
-Si falla → fallback heuristico local (sin red)
-       ↓
-AnalysisPreview: resumen, tareas, riesgos, codex loop
-       ↓
-Acciones: crear tarjetas en board, copiar informe
+                    +------------------+
+                    |   Dashboard UI   |
+                    +--------+---------+
+                             |
+          +------------------+------------------+
+          |                  |                  |
+    +-----+------+   +------+------+   +-------+-------+
+    |   Board    |   | Right Panel |   |  Command Dock |
+    |  (Kanban)  |   |   (Detail)  |   | (Cmd/Analyze) |
+    +-----+------+   +------+------+   +-------+-------+
+          |                  |                  |
+          +------------------+------------------+
+                             |
+                   +---------+---------+
+                   | SentinelProvider  |
+                   | Context+Reducer   |
+                   +---------+---------+
+                             |
+               +-------------+-------------+
+               |                           |
+      +--------+--------+        +--------+--------+
+      | API Routes       |        | HEO Copilot     |
+      | /api/tasks       |        | Terminal Panel   |
+      | /api/events      |        +--------+--------+
+      | /api/comments    |                 |
+      +--------+--------+        +--------+--------+
+               |                 | action-resolver  |
+               |                 | action-executor  |
+               |                 +--------+--------+
+               |                          |
+               |                 +--------+--------+
+               |                 | ai-router.ts    |
+               |                 | (LLM fallback)  |
+               |                 +-----------------+
+               |
+         +-----+-----+
+         |  SQLite    |
+         | sentinel.db|
+         +-----------+
 ```
 
-### Contrato del planner
+---
 
-```json
-{
-  "summary": "string",
-  "objective": "string",
-  "hypothesis": "string",
-  "risks": ["string"],
-  "next_steps": ["string"],
-  "backlog_tasks": ["string"],
-  "codex_loop": {
-    "problem": "string",
-    "objective": "string",
-    "hypothesis": "string",
-    "solution": "string",
-    "validation": "string",
-    "next_step": "string"
-  }
-}
-```
+## Base de Datos
 
-## Variables de entorno
-
-```bash
-# .env.local
-
-# Ollama (primario — defaults funcionan si Ollama corre local)
-OLLAMA_BASE_URL=http://localhost:11434   # opcional
-OLLAMA_MODEL=qwen3:8b                    # o cualquier modelo instalado
-
-# OpenRouter (secundario — solo si OPENROUTER_API_KEY esta definida)
-OPENROUTER_API_KEY=sk-or-...             # https://openrouter.ai/keys
-OPENROUTER_MODEL=qwen/qwen3-8b:free      # opcional, free tier disponible
-
-# Anthropic (terciario — solo si ANTHROPIC_API_KEY esta definida)
-ANTHROPIC_API_KEY=sk-ant-...             # https://console.anthropic.com/
-ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # ~$0.001 por análisis
-```
-
-**Prioridad del router**: Ollama → OpenRouter → Anthropic → Fallback heurístico
-
-## Setup
-
-```bash
-# Clonar
-git clone https://github.com/tu-usuario/sentinel-board.git
-cd sentinel-board
-
-# Instalar dependencias
-npm install
-
-# Configurar variables de entorno
-cp .env.example .env.local  # o crear manualmente
-
-# Crear tablas y poblar la DB con datos iniciales
-npm run db:push
-npm run db:seed
-
-# (Opcional) Tener Ollama corriendo con un modelo para IA
-ollama pull qwen2.5-coder:7b
-
-# Iniciar servidor de desarrollo
-npm run dev
-```
-
-Abrir [https://localhost:3000/board](https://localhost:3000/board)
-
-## Persistencia (SQLite + Drizzle)
-
-La DB vive en `data/sentinel.db` (SQLite, gitignored).
-
-### Scripts disponibles
-
-| Script | Que hace |
-|--------|----------|
-| `npm run db:push` | Crea/actualiza tablas segun el schema (`lib/db/schema.ts`) |
-| `npm run db:seed` | Puebla la DB con los datos mock iniciales |
-| `npm run db:studio` | Abre Drizzle Studio para inspeccionar la DB |
-
-### Schema (6 tablas)
+7 tablas en SQLite via Drizzle ORM (`data/sentinel.db`):
 
 | Tabla | Descripcion |
 |-------|------------|
-| `projects` | Proyectos del board |
-| `tasks` | Cards/tareas con JSON para tags, codexLoop, fiveWhys, moneyCode |
-| `task_checklist_items` | Items de checklist por tarea (FK → tasks) |
-| `events` | Timeline de eventos |
+| `projects` | Proyectos del workspace |
+| `tasks` | Cards con status, priority, tags, codexLoop, fiveWhys, moneyCode (JSON) |
+| `task_checklist_items` | Items de checklist por tarea |
+| `card_comments` | Comentarios por card (4 tipos) |
+| `events` | Timeline de eventos del sistema |
 | `dock_commands` | Registro de comandos del dock |
 | `focus_sessions` | Sesiones de foco |
 
-### Flujo de datos
+### Scripts de BD
 
-```
-[Browser] → dispatch(CREATE_CARD) → reducer (UI local) + POST /api/tasks (DB)
-[Browser] → dispatch(MOVE_CARD)   → reducer (UI local) + PATCH /api/tasks/:id (DB)
-[Mount]   → fetch /api/tasks + /api/projects + /api/events → HYDRATE reducer
-[Fallback] → si DB vacia o error → mocks como antes
-```
+| Script | Que hace |
+|--------|----------|
+| `npm run db:push` | Crea/actualiza tablas segun el schema |
+| `npm run db:seed` | Puebla la BD con datos iniciales |
+| `npm run db:studio` | Abre Drizzle Studio para inspeccionar |
 
-### API endpoints
+---
+
+## API
 
 | Metodo | Ruta | Descripcion |
 |--------|------|------------|
-| GET | `/api/tasks` | Lista tareas con checklist desde DB |
-| POST | `/api/tasks` | Crea tarea + evento |
-| PATCH | `/api/tasks/:id` | Actualiza status, titulo, prioridad, etc. |
-| DELETE | `/api/tasks/:id` | Elimina tarea + evento |
-| GET | `/api/projects` | Lista proyectos |
-| GET | `/api/events` | Lista eventos del timeline |
-| POST | `/api/events` | Registra evento |
-| GET/POST | `/api/dock-commands` | Registro de comandos del dock |
-| GET/POST | `/api/focus-sessions` | Sesiones de foco |
-| POST | `/api/agents/run` | Ejecuta agente IA |
+| `GET` | `/api/tasks` | Lista tareas con checklist |
+| `POST` | `/api/tasks` | Crea tarea + evento |
+| `PATCH` | `/api/tasks/:id` | Actualiza campos de tarea |
+| `DELETE` | `/api/tasks/:id` | Elimina tarea + evento |
+| `GET` | `/api/tasks/:id/comments` | Comentarios de una card |
+| `POST` | `/api/tasks/:id/comments` | Agrega comentario |
+| `POST` | `/api/terminal/run` | Ejecuta comando en terminal |
+| `POST` | `/api/agents/run` | Ejecuta agente IA |
+| `GET` | `/api/projects` | Lista proyectos |
+| `GET/POST` | `/api/events` | Timeline de eventos |
+| `GET/POST` | `/api/dock-commands` | Registro del dock |
+| `GET/POST` | `/api/focus-sessions` | Sesiones de foco |
 
-## Estructura del proyecto
+---
+
+## Estructura del Proyecto
 
 ```
 app/
   (dashboard)/
-    layout.tsx              → Shell: sidebar + topbar + panel + dock
-    page.tsx                → Redirect a /board
-    board/page.tsx          → Vista principal del board
-  api/tasks/route.ts        → GET + POST tareas (DB)
-  api/tasks/[id]/route.ts   → PATCH tarea
-  api/projects/route.ts     → GET proyectos (DB)
-  api/events/route.ts       → GET + POST eventos (DB)
-  api/agents/run/route.ts   → Endpoint de agentes
+    layout.tsx                  Shell: sidebar + topbar + HEO Copilot + dock
+    board/page.tsx              Vista principal del board
+  api/
+    tasks/                      CRUD de tareas
+    tasks/[id]/comments/        Comentarios por card
+    terminal/run/               Endpoint de la terminal
+    agents/run/                 Endpoint de agentes IA
+    events/                     Timeline
+    projects/                   Proyectos
 
 components/
-  board/
-    board-view.tsx          → DndContext + kanban + timeline + backlog
-    column.tsx              → Columna droppable
-    card-item.tsx           → Card draggable
-  console/
-    command-dock.tsx         → Dock: comando + analizar + acciones rapidas
-    command-input.tsx        → Input con sugerencias y feedback en vivo
-    command-log.tsx          → Registro de eventos del dock
-    command-suggestions.tsx  → Sugerencias HEO
-    focus-timer.tsx          → Temporizador de foco
-    quick-actions.tsx        → Botones rapidos
-  layout/
-    app-sidebar.tsx          → Sidebar con proyectos
-    topbar.tsx               → Barra superior con vistas
-    right-panel.tsx          → Detalle: codex loop, money code, acciones
-  modals/
-    create-task-modal.tsx    → Modal crear tarea
-    move-state-modal.tsx     → Modal mover estado
-  ui/
-    toast.tsx                → Sistema de toast contextual (sin librerias)
-    button.tsx, card.tsx...  → shadcn/ui primitives
+  board/                        board-view, column, card-item
+  console/                      command-dock, input, log, suggestions, timer
+  terminal/                     terminal-panel (xterm.js, HEO Copilot)
+  layout/                       app-sidebar, topbar, right-panel
+  modals/                       create-task-modal, move-state-modal
+  ui/                           shadcn primitives (button, card, toast, etc.)
 
 lib/
-  db/
-    schema.ts               → Schema Drizzle (6 tablas)
-    index.ts                → Conexion SQLite singleton
-    seed.ts                 → Script de seed desde mocks
-  ai/
-    ai-router.ts            → Router Ollama → OpenRouter → fallback
-  agents/
-    run-agent.ts             → Orquestador de agentes
-    load-agent.ts            → Definiciones de agentes
-    build-agent-prompt.ts    → Constructor de prompts
-    parse-planner-response.ts → Parser seguro de JSON
-  state/
-    sentinel-store.tsx       → Provider + hooks + persistencia automatica
-    sentinel-reducer.ts      → Reducer: HYDRATE, MOVE_CARD, CREATE_CARD, etc.
-  console/
-    command-parser.ts        → Parser de comandos del dock
-    command-executor.ts      → Ejecutor de comandos
-    local-analysis.ts        → Analisis heuristico (fallback sin IA)
-    codex-loop-generator.ts  → Generador de Codex Loop
-    money-code-generator.ts  → Generador de Codigo del Dinero
+  state/                        sentinel-store.tsx, sentinel-reducer.ts
+  db/                           schema.ts, index.ts, seed.ts
+  ai/                           ai-router.ts, ai-provider.ts, providers/
+  agents/                       run-agent, load-agent, build-prompt, parse-response
+  server/                       terminal-runner, action-resolver, action-executor
+  terminal/                     use-terminal.ts (hook cliente)
+  console/                      command-parser, command-executor, generators
 
-agents/
-  definitions/               → YAML de definicion de agentes
-  prompts/                   → Prompts base en markdown
-  skills/                    → Skills por agente
-
-types/
-  card.ts, enums.ts, event.ts, project.ts, timer.ts, agent.ts
+types/                          card, comment, enums, event, project, timer, agent
+agents/                         definitions/ (YAML), prompts/ (MD), skills/
 ```
 
-## Fase actual
+---
 
-**MVP funcional** — board operativo con:
+## Estado del Proyecto
 
-- [x] Kanban 9 columnas con drag & drop real
-- [x] Command Dock con parser de comandos en lenguaje natural
-- [x] Analisis con agente planner (Ollama local)
-- [x] Fallback heuristico cuando no hay IA disponible
-- [x] Panel derecho con Codex Loop + Codigo del Dinero
+### Implementado
+
+- [x] Kanban 9 columnas con drag & drop
+- [x] Command Dock (crear, mover, foco, tiempo)
+- [x] Analisis con agente planner (Ollama/OpenRouter/Anthropic)
+- [x] Fallback heuristico completo (sin IA)
+- [x] Panel derecho: Codex Loop + Codigo del Dinero
+- [x] Comentarios por card (4 tipos)
+- [x] Eliminar cards (board + panel derecho)
+- [x] Edicion generica de cards (UPDATE_CARD)
+- [x] HEO Copilot: terminal con acciones reales
+- [x] MOVE_CARD tolerante a lenguaje natural
+- [x] Auto-refresh del board tras acciones de terminal
+- [x] Persistencia real SQLite + Drizzle
+- [x] API CRUD completa (GET, POST, PATCH, DELETE)
+- [x] Hidratacion del board desde BD
 - [x] Timeline con eventos clickeables
-- [x] Sistema de toast contextual (copiar informe/comando)
+- [x] Backlog inteligente con scoring
 - [x] Filtro por proyecto en sidebar
-- [x] Temporizador de foco integrado
+- [x] Temporizador de foco
+- [x] Toast contextual
+- [x] Timestamps en cards
 
-### Completado recientemente
+### Roadmap
 
-- [x] Persistencia real con SQLite + Drizzle
-- [x] API CRUD para tasks (GET, POST, PATCH)
-- [x] Hydration del board desde DB al iniciar
-- [x] Mover/crear cards persiste en DB
-
-### Pendiente — Etapa 2
-
-- [ ] Ingesta real de amon-agents (pipeline DB, no filesystem)
-- [ ] Multiples agentes activos (qa-reviewer, state-guardian)
-- [ ] Edicion completa de cards (checklist, codexLoop, moneyCode via API)
+- [ ] Streaming de respuestas en la terminal (SSE)
+- [ ] Multi-agente activo (qa-reviewer, state-guardian)
+- [ ] Edicion inline de cards en el panel derecho
 - [ ] Sorting dentro de columnas (drag intra-columna)
 - [ ] Touch support para drag & drop
-- [ ] Modo offline completo (PWA)
+- [ ] PWA / modo offline completo
+- [ ] Ingesta real de amon-agents via pipeline DB
+- [ ] Tests (Vitest + Playwright)
+
+---
+
+## Variables de Entorno
+
+Copiar `.env.example` a `.env.local`. Todos los valores son opcionales:
+
+```bash
+# Ollama (primario -- funciona si Ollama corre local)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:8b
+
+# OpenRouter (secundario -- requiere API key)
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=qwen/qwen3-8b:free
+
+# Anthropic (terciario -- requiere API key)
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+```
+
+---
+
+## Contribuir
+
+Ver [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licencia
 
