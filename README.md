@@ -130,6 +130,47 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 
 ![Card siendo arrastrada entre columnas](docs/screenshots/drag-drop.png)
 
+### Búsqueda y Filtros Backend-First
+
+La barra superior ya no usa placeholders visuales. La búsqueda y los filtros consultan Postgres via API:
+
+- `GET /api/tasks?q=&projectId=&status=&priority=&tag=`
+- `GET /api/search?q=&projectId=&status=&priority=&tag=`
+- `GET /api/knowledge?q=&projectId=&category=&status=&tag=`
+
+La UI usa esos endpoints para:
+
+- buscar tareas reales
+- buscar documentación persistida en BD
+- filtrar por proyecto, estado, prioridad y tag
+
+### Knowledge Base
+
+Sentinel Board ahora persiste documentación operativa en la tabla `knowledge_entries`.
+
+Campos principales:
+
+- `projectId`
+- `title`
+- `slug`
+- `category`
+- `status`
+- `tags`
+- `summary`
+- `body`
+- `sourceTaskId`
+- timestamps
+
+Casos de uso:
+
+- informes técnicos
+- decisiones
+- runbooks
+- postmortems
+- notas operativas
+
+El informe de migración a Neon/Render quedó guardado tanto como card/comentario como en `knowledge_entries`, así que ya es buscable por tags y proyecto.
+
 ### Mas
 
 - **Timeline**: Registro cronologico de toda accion ejecutada
@@ -203,7 +244,7 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 
 ## Base de Datos
 
-7 tablas en PostgreSQL via Drizzle ORM:
+8 tablas en PostgreSQL via Drizzle ORM:
 
 | Tabla | Descripcion |
 |-------|------------|
@@ -214,6 +255,7 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 | `events` | Timeline de eventos del sistema |
 | `dock_commands` | Registro de comandos del dock |
 | `focus_sessions` | Sesiones de foco |
+| `knowledge_entries` | Documentación operativa persistida y buscable |
 
 ### Scripts de BD
 
@@ -249,6 +291,15 @@ npm run db:seed
 
 La primera vez, `npm run db:generate` creara la carpeta `drizzle/` con el SQL inicial del sistema.
 
+Si agregas tablas nuevas, el flujo correcto es:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+No basta con `db:generate`: ese comando solo crea el SQL. `db:migrate` aplica el schema real en Neon/Render.
+
 ### Render
 
 Config recomendada para el servicio web:
@@ -263,6 +314,24 @@ Variables minimas:
 ```text
 DATABASE_URL=postgresql://...
 PG_POOL_MAX=10
+```
+
+## Backend-First
+
+Desde esta etapa, el board ya no depende de datos mock para su flujo principal:
+
+- la persistencia base vive en Postgres
+- las cards se hidratan desde `/api/tasks`
+- el timeline se hidrata desde `/api/events`
+- la documentación se hidrata desde `/api/knowledge`
+- la búsqueda agregada usa `/api/search`
+
+Si la UI aparece vacía, la primera verificación correcta ya no es revisar mocks sino consultar las APIs:
+
+```bash
+curl http://localhost:3000/api/tasks
+curl http://localhost:3000/api/events
+curl http://localhost:3000/api/knowledge
 ```
 
 ---
