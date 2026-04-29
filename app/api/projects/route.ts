@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const rows = db.select().from(projects).all();
+    const rows = await db.select().from(projects);
 
     const result: Project[] = rows.map((r) => ({
       id: r.id,

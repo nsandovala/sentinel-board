@@ -1,10 +1,18 @@
+import { config as loadEnv } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+
+loadEnv({ path: ".env.local" });
+loadEnv();
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required to run Drizzle against Postgres. Define it in .env.local or .env.");
+}
 
 export default defineConfig({
   schema: "./lib/db/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
-    url: "./data/sentinel.db",
+    url: process.env.DATABASE_URL,
   },
 });

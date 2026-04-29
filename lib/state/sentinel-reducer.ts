@@ -4,6 +4,7 @@ import type { DockEvent } from "@/types/event";
 import type { CardComment } from "@/types/comment";
 import type { FocusSession } from "@/types/timer";
 import type { CardStatus } from "@/types/enums";
+import type { KnowledgeEntry } from "@/types/knowledge";
 import { STATUS_LABELS } from "@/lib/console/status-labels";
 
 export type ActiveView = "board" | "timeline" | "backlog";
@@ -12,11 +13,16 @@ export interface SentinelState {
   projects: Project[];
   cards: SentinelCard[];
   events: DockEvent[];
+  knowledgeEntries: KnowledgeEntry[];
   cardComments: CardComment[];
   cardCommentsFor: string | null;
   selectedCardId: string | null;
   /** null = sin filtro (comportamiento previo del board y vistas) */
   selectedProjectId: string | null;
+  searchQuery: string;
+  statusFilter: string;
+  priorityFilter: string;
+  tagFilter: string;
   activeView: ActiveView;
   focusSession: FocusSession;
 }
@@ -24,14 +30,24 @@ export interface SentinelState {
 export type SentinelAction =
   | { type: "SELECT_CARD"; cardId: string | null }
   | { type: "SELECT_PROJECT"; projectId: string | null }
+  | { type: "SET_SEARCH_QUERY"; query: string }
+  | { type: "SET_STATUS_FILTER"; value: string }
+  | { type: "SET_PRIORITY_FILTER"; value: string }
+  | { type: "SET_TAG_FILTER"; value: string }
+  | { type: "CLEAR_SEARCH_FILTERS" }
   | { type: "SET_VIEW"; view: ActiveView }
   | { type: "MOVE_CARD"; cardId: string; status: CardStatus }
   | { type: "DELETE_CARD"; cardId: string }
   | { type: "CREATE_CARD"; card: SentinelCard }
-  | { type: "DELETE_CARD"; cardId: string }
   | { type: "UPDATE_CARD"; cardId: string; updates: Partial<Omit<SentinelCard, "id">> }
   | { type: "LOAD_AGENT_CARDS"; cards: SentinelCard[] }
-  | { type: "HYDRATE"; cards: SentinelCard[]; projects?: Project[]; events?: DockEvent[] }
+  | {
+      type: "HYDRATE";
+      cards: SentinelCard[];
+      projects?: Project[];
+      events?: DockEvent[];
+      knowledgeEntries?: KnowledgeEntry[];
+    }
   | { type: "ADD_EVENT"; event: DockEvent }
   | { type: "SET_CARD_COMMENTS"; cardId: string; comments: CardComment[] }
   | { type: "ADD_COMMENT"; comment: CardComment }
@@ -70,6 +86,27 @@ export function sentinelReducer(
         selectedCardId,
       };
     }
+
+    case "SET_SEARCH_QUERY":
+      return { ...state, searchQuery: action.query };
+
+    case "SET_STATUS_FILTER":
+      return { ...state, statusFilter: action.value };
+
+    case "SET_PRIORITY_FILTER":
+      return { ...state, priorityFilter: action.value };
+
+    case "SET_TAG_FILTER":
+      return { ...state, tagFilter: action.value };
+
+    case "CLEAR_SEARCH_FILTERS":
+      return {
+        ...state,
+        searchQuery: "",
+        statusFilter: "",
+        priorityFilter: "",
+        tagFilter: "",
+      };
 
     case "SET_VIEW":
       return { ...state, activeView: action.view };
@@ -116,21 +153,6 @@ export function sentinelReducer(
       };
     }
 
-    case "DELETE_CARD": {
-      const target = state.cards.find((c) => c.id === action.cardId);
-      if (!target) return state;
-      return {
-        ...state,
-        cards: state.cards.filter((c) => c.id !== action.cardId),
-        selectedCardId:
-          state.selectedCardId === action.cardId ? null : state.selectedCardId,
-        events: [
-          ...state.events,
-          createEvent("command", `Tarea eliminada: "${target.title}"`),
-        ],
-      };
-    }
-
     case "UPDATE_CARD": {
       const cardExists = state.cards.some((c) => c.id === action.cardId);
       if (!cardExists) return state;
@@ -146,6 +168,7 @@ export function sentinelReducer(
         cards: action.cards,
         ...(action.projects ? { projects: action.projects } : {}),
         ...(action.events ? { events: action.events } : {}),
+        ...(action.knowledgeEntries ? { knowledgeEntries: action.knowledgeEntries } : {}),
       };
     }
 

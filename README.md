@@ -13,7 +13,7 @@
 | Los kanbans son pasivos | Cards con acciones reales: eliminar, mover, comentar desde terminal |
 | El analisis vive fuera del board | Pegar texto -> analisis estructurado -> cards en el board, todo en un flujo |
 | La IA reemplaza al usuario | La IA es opcional. El sistema completo funciona offline sin providers |
-| El estado se pierde al recargar | SQLite local-first. Persistencia real en cada accion |
+| El estado se pierde al recargar | Postgres + Drizzle. Persistencia real en cada accion |
 
 ---
 
@@ -23,11 +23,21 @@
 git clone https://github.com/nsandovala/sentinel-board.git
 cd sentinel-board
 npm install
+cp .env.example .env.local
+# poner DATABASE_URL de Render Postgres
 npm run db:push && npm run db:seed
 npm run dev
 ```
 
-Abrir [https://localhost:3000/board](https://localhost:3000/board) -- funciona sin IA.
+Usar Node `22` (ver `.nvmrc`) para evitar problemas de arranque con versiones no LTS.
+
+Abrir [http://localhost:3000/board](http://localhost:3000/board) -- funciona sin IA.
+
+Si necesitas HTTPS local para probar certificados o APIs seguras:
+
+```bash
+npm run dev:https
+```
 
 ### Providers de IA (opcionales)
 
@@ -39,7 +49,9 @@ Abrir [https://localhost:3000/board](https://localhost:3000/board) -- funciona s
 | Anthropic | ~$0.001/req | Crear cuenta en [console.anthropic.com](https://console.anthropic.com) -> copiar API key |
 
 ```bash
-# .env.local (todos opcionales)
+# .env.local
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+PG_POOL_MAX=10
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen3:8b
 OPENROUTER_API_KEY=sk-or-...
@@ -135,11 +147,11 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 | Lenguaje | TypeScript strict |
 | UI | React 19 + shadcn/ui + Radix primitives |
 | Estilos | Tailwind CSS 4 + CSS custom properties (OKLCH) |
-| Persistencia | SQLite + Drizzle ORM (local-first) |
+| Persistencia | PostgreSQL + Drizzle ORM |
 | Drag & drop | @dnd-kit/core + @dnd-kit/utilities |
 | Terminal | xterm.js + addon-fit |
 | IA | Ollama -> OpenRouter -> Anthropic -> fallback heuristico |
-| Estado | React Context + useReducer (UI) / SQLite (verdad) |
+| Estado | React Context + useReducer (UI) / PostgreSQL (verdad) |
 
 ---
 
@@ -191,7 +203,7 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 
 ## Base de Datos
 
-7 tablas en SQLite via Drizzle ORM (`data/sentinel.db`):
+7 tablas en PostgreSQL via Drizzle ORM:
 
 | Tabla | Descripcion |
 |-------|------------|
@@ -208,8 +220,50 @@ Arrastrar cards entre columnas con feedback visual. Persistencia automatica via 
 | Script | Que hace |
 |--------|----------|
 | `npm run db:push` | Crea/actualiza tablas segun el schema |
+| `npm run db:generate` | Genera migraciones SQL versionadas en `drizzle/` |
+| `npm run db:migrate` | Ejecuta migraciones pendientes en la base |
 | `npm run db:seed` | Puebla la BD con datos iniciales |
 | `npm run db:studio` | Abre Drizzle Studio para inspeccionar |
+
+### Flujo recomendado
+
+En desarrollo rapido:
+
+```bash
+npm run db:push
+npm run db:seed
+```
+
+Para despliegue serio en Render:
+
+```bash
+# 1. generar la migracion desde el schema actual
+npm run db:generate
+
+# 2. aplicar migraciones en tu base
+npm run db:migrate
+
+# 3. poblar datos de ejemplo si quieres
+npm run db:seed
+```
+
+La primera vez, `npm run db:generate` creara la carpeta `drizzle/` con el SQL inicial del sistema.
+
+### Render
+
+Config recomendada para el servicio web:
+
+```text
+Build Command: npm install && npm run db:migrate && npm run build
+Start Command: npm start
+```
+
+Variables minimas:
+
+```text
+DATABASE_URL=postgresql://...
+PG_POOL_MAX=10
+```
 
 ---
 

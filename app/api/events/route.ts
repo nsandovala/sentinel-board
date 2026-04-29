@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const rows = db.select().from(events).all();
+    const rows = await db.select().from(events);
 
     const result: DockEvent[] = rows.map((r) => ({
       id: r.id,
@@ -36,13 +36,12 @@ export async function POST(req: NextRequest) {
     }
 
     const id = `ev-${Date.now()}`;
-    db.insert(events)
+    await db.insert(events)
       .values({
         id,
         type: body.type as DockEvent["type"],
         message: body.message,
-      })
-      .run();
+      });
 
     return NextResponse.json({ ok: true, id });
   } catch (err) {

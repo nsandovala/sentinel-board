@@ -1,16 +1,39 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-const DATA_DIR = join(process.cwd(), "data");
-const DB_PATH = join(DATA_DIR, "sentinel.db");
+declare global {
+  var __sentinelPgPool: Pool | undefined;
+}
 
-mkdirSync(DATA_DIR, { recursive: true });
+function getDatabaseUrl() {
+  const value = process.env.DATABASE_URL?.trim();
+  if (!value) {
+    throw new Error("DATABASE_URL is required. Configure Postgres before starting Sentinel Board.");
+  }
+  return value;
+}
 
-const sqlite = new Database(DB_PATH);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+function shouldUseSsl(connectionString: string) {
+  return (
+    connectionString.includes("sslmode=require") ||
+    connectionString.includes("neon.tech") ||
+    process.env.PGSSL === "true"
+  );
+}
 
-export const db = drizzle(sqlite, { schema });
+const connectionString = getDatabaseUrl();
+const pool =
+  globalThis.__sentinelPgPool ??
+  new Pool({
+    connectionString,
+    ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
+    max: Number(process.env.PG_POOL_MAX ?? "10"),
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalThis.__sentinelPgPool = pool;
+}
+
+export const db = drizzle(pool, { schema });
+export { pool };

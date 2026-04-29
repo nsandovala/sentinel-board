@@ -6,13 +6,10 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useRef,
   type Dispatch,
   type ReactNode,
 } from "react";
-
-import { cards as mockCards } from "@/lib/mock/cards";
-import { projects as mockProjects } from "@/lib/mock/projects";
-import { initialEvents } from "@/lib/console/mock-events";
 
 import {
   sentinelReducer,
@@ -24,15 +21,21 @@ import type { CardComment } from "@/types/comment";
 import type { DockEvent } from "@/types/event";
 import type { Project } from "@/types/project";
 import type { CardStatus } from "@/types/enums";
+import type { KnowledgeEntry } from "@/types/knowledge";
 
 const initialState: SentinelState = {
-  projects: mockProjects,
-  cards: mockCards,
-  events: initialEvents,
+  projects: [],
+  cards: [],
+  events: [],
+  knowledgeEntries: [],
   cardComments: [],
   cardCommentsFor: null,
   selectedCardId: null,
   selectedProjectId: null,
+  searchQuery: "",
+  statusFilter: "",
+  priorityFilter: "",
+  tagFilter: "",
   activeView: "board",
   focusSession: { state: "idle", elapsed: 0 },
 };
@@ -41,37 +44,71 @@ const StateCtx = createContext<SentinelState>(initialState);
 const DispatchCtx = createContext<Dispatch<SentinelAction>>(() => {});
 const RefreshCtx = createContext<() => void>(() => {});
 
-async function hydrateFromDB(dispatch: Dispatch<SentinelAction>) {
+async function hydrateFromDB(
+  dispatch: Dispatch<SentinelAction>,
+  state: Pick<
+    SentinelState,
+    "selectedProjectId" | "searchQuery" | "statusFilter" | "priorityFilter" | "tagFilter"
+  >,
+) {
   try {
-    const [tasksRes, projectsRes, eventsRes] = await Promise.all([
-      fetch("/api/tasks").then((r) => r.json()),
+    const params = new URLSearchParams();
+    if (state.selectedProjectId) params.set("projectId", state.selectedProjectId);
+    if (state.searchQuery.trim()) params.set("q", state.searchQuery.trim());
+    if (state.statusFilter) params.set("status", state.statusFilter);
+    if (state.priorityFilter) params.set("priority", state.priorityFilter);
+    if (state.tagFilter) params.set("tag", state.tagFilter);
+
+    const taskUrl = params.toString() ? `/api/tasks?${params.toString()}` : "/api/tasks";
+    const knowledgeUrl = params.toString()
+      ? `/api/knowledge?${params.toString()}`
+      : "/api/knowledge";
+
+    const [tasksRes, projectsRes, eventsRes, knowledgeRes] = await Promise.allSettled([
+      fetch(taskUrl).then((r) => r.json()),
       fetch("/api/projects").then((r) => r.json()),
       fetch("/api/events").then((r) => r.json()),
+      fetch(knowledgeUrl).then((r) => r.json()),
     ]);
 
-    const cards: SentinelCard[] | undefined =
-      tasksRes.ok && Array.isArray(tasksRes.tasks) && tasksRes.tasks.length > 0
-        ? tasksRes.tasks
-        : undefined;
+    const cards: SentinelCard[] =
+      tasksRes.status === "fulfilled" && tasksRes.value.ok && Array.isArray(tasksRes.value.tasks)
+        ? tasksRes.value.tasks
+        : [];
 
     const projects: Project[] | undefined =
-      projectsRes.ok && Array.isArray(projectsRes.projects) && projectsRes.projects.length > 0
-        ? projectsRes.projects
+      projectsRes.status === "fulfilled" &&
+        projectsRes.value.ok &&
+        Array.isArray(projectsRes.value.projects)
+        ? projectsRes.value.projects
         : undefined;
 
     const events: DockEvent[] | undefined =
-      eventsRes.ok && Array.isArray(eventsRes.events) && eventsRes.events.length > 0
-        ? eventsRes.events.map((e: DockEvent & { timestamp?: string }) => ({
+      eventsRes.status === "fulfilled" &&
+        eventsRes.value.ok &&
+        Array.isArray(eventsRes.value.events)
+        ? eventsRes.value.events.map((e: DockEvent & { timestamp?: string }) => ({
             ...e,
             timestamp: new Date(e.timestamp),
           }))
         : undefined;
 
-    if (cards) {
-      dispatch({ type: "HYDRATE", cards, projects, events });
-    }
+    const knowledgeEntries: KnowledgeEntry[] =
+      knowledgeRes.status === "fulfilled" &&
+        knowledgeRes.value.ok &&
+        Array.isArray(knowledgeRes.value.knowledge)
+        ? knowledgeRes.value.knowledge
+        : [];
+
+    dispatch({
+      type: "HYDRATE",
+      cards,
+      projects,
+      events,
+      knowledgeEntries,
+    });
   } catch {
-    // DB unavailable — keep mocks
+    // Keep current UI state if hydration fails completely.
   }
 }
 
@@ -111,6 +148,21 @@ function persistComment(comment: CardComment) {
   }).catch(() => {});
 }
 
+function persistFocusAction(
+  action: "start" | "end" | "pause" | "resume",
+  project?: string,
+  elapsedSeconds?: number,
+) {
+  const body: Record<string, unknown> = { action };
+  if (project) body.project = project;
+  if (elapsedSeconds != null) body.elapsedSeconds = elapsedSeconds;
+  fetch("/api/focus-sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
 async function loadCardComments(
   cardId: string,
   dispatch: Dispatch<SentinelAction>,
@@ -127,6 +179,8 @@ async function loadCardComments(
 
 export function SentinelProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(sentinelReducer, initialState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const dispatch: Dispatch<SentinelAction> = useCallback(
     (action: SentinelAction) => {
@@ -147,6 +201,12 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
       if (action.type === "ADD_COMMENT") {
         persistComment(action.comment);
       }
+      if (action.type === "START_FOCUS") {
+        persistFocusAction("start", action.project);
+      }
+      if (action.type === "END_FOCUS") {
+        persistFocusAction("end", undefined, stateRef.current.focusSession.elapsed);
+      }
       if (action.type === "SELECT_CARD" && action.cardId) {
         loadCardComments(action.cardId, rawDispatch);
       }
@@ -155,12 +215,25 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(() => {
-    hydrateFromDB(rawDispatch);
+    hydrateFromDB(rawDispatch, {
+      selectedProjectId: stateRef.current.selectedProjectId,
+      searchQuery: stateRef.current.searchQuery,
+      statusFilter: stateRef.current.statusFilter,
+      priorityFilter: stateRef.current.priorityFilter,
+      tagFilter: stateRef.current.tagFilter,
+    });
   }, []);
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [
+    refresh,
+    state.selectedProjectId,
+    state.searchQuery,
+    state.statusFilter,
+    state.priorityFilter,
+    state.tagFilter,
+  ]);
 
   return (
     <StateCtx.Provider value={state}>

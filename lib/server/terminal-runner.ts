@@ -41,6 +41,7 @@ export interface TerminalRunResult {
   logs: string[];
   rawText?: string;
   structuredOutput?: unknown;
+  meta?: Record<string, unknown>;
   isJson: boolean;
   hint?: string;
   error?: string;
@@ -97,7 +98,7 @@ export async function runTerminalCommand(
   const action = resolveAction(cmd);
   if (action) {
     logs.push(`action: ${action.type}`);
-    const result = executeAction(action);
+    const result = await executeAction(action);
     const durationMs = Date.now() - start;
     logs.push(`local (${durationMs}ms)`);
 
@@ -109,6 +110,7 @@ export async function runTerminalCommand(
       logs,
       rawText: result.message,
       structuredOutput: result.data,
+      meta: result.meta,
       isJson: false,
       hint: result.hint,
       error: result.ok ? undefined : result.message,
@@ -116,7 +118,9 @@ export async function runTerminalCommand(
     };
   }
 
-  // ── Fallback to AI router ──
+  // ── Fallback to AI router — no local action matched ──
+  logs.push(`[guardrail] No local match for: "${cmd.slice(0, 60)}" → fallback to LLM`);
+
   let userPrompt = cmd;
   if (input.context) userPrompt += `\n\nContext:\n${input.context}`;
   if (input.projectId) userPrompt += `\nProject: ${input.projectId}`;

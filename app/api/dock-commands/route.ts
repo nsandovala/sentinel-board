@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const id = `dc-${Date.now()}`;
 
-    db.insert(dockCommands)
+    await db.insert(dockCommands)
       .values({
         id,
         action: body.action,
@@ -37,8 +37,7 @@ export async function POST(req: NextRequest) {
         raw: body.raw,
         success: body.success ?? false,
         resultMessage: body.resultMessage ?? null,
-      })
-      .run();
+      });
 
     return NextResponse.json({ ok: true, id });
   } catch (err) {
@@ -51,7 +50,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const rows = db.select().from(dockCommands).all();
+    const rows = await db.select().from(dockCommands);
     return NextResponse.json({ ok: true, commands: rows });
   } catch (err) {
     return NextResponse.json(

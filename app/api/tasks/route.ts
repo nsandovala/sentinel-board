@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { tasks, taskChecklistItems, events } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { tasks, taskChecklistItems } from "@/lib/db/schema";
+import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { logDockEvent } from "@/lib/server/log-event";
 import type { SentinelCard } from "@/types/card";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +36,40 @@ function assembleCard(
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const allTasks = db.select().from(tasks).all();
-    const allChecklist = db.select().from(taskChecklistItems).all();
+    const { searchParams } = new URL(req.url);
+    const q = searchParams.get("q")?.trim();
+    const projectId = searchParams.get("projectId")?.trim();
+    const status = searchParams.get("status")?.trim();
+    const priority = searchParams.get("priority")?.trim();
+    const tag = searchParams.get("tag")?.trim().toLowerCase();
+
+    const conditions = [];
+    if (projectId) conditions.push(eq(tasks.projectId, projectId));
+    if (status) conditions.push(eq(tasks.status, status));
+    if (priority) conditions.push(eq(tasks.priority, priority));
+    if (q) {
+      conditions.push(
+        or(
+          ilike(tasks.title, `%${q}%`),
+          ilike(tasks.description, `%${q}%`),
+        )!,
+      );
+    }
+
+    const [allTasks, allChecklist] = await Promise.all([
+      db
+        .select()
+        .from(tasks)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(tasks.updatedAt)),
+      db.select().from(taskChecklistItems),
+    ]);
+
+    const filteredTasks = tag
+      ? allTasks.filter((row) => ((row.tags ?? []) as string[]).some((t) => t.toLowerCase() === tag))
+      : allTasks;
 
     const checklistByTask = new Map<string, (typeof taskChecklistItems.$inferSelect)[]>();
     for (const ci of allChecklist) {
@@ -47,7 +78,7 @@ export async function GET() {
       checklistByTask.set(ci.taskId, arr);
     }
 
-    const cards: SentinelCard[] = allTasks.map((t) =>
+    const cards: SentinelCard[] = filteredTasks.map((t) =>
       assembleCard(t, checklistByTask.get(t.id) ?? []),
     );
 
@@ -70,7 +101,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    db.insert(tasks)
+    await db.insert(tasks)
       .values({
         id: body.id,
         title: body.title,
@@ -85,38 +116,29 @@ export async function POST(req: NextRequest) {
         codexLoop: (body.codexLoop as Record<string, string | undefined>) ?? null,
         fiveWhys: (body.fiveWhys as Record<string, string | undefined>) ?? null,
         moneyCode: (body.moneyCode as unknown as Record<string, number | undefined>) ?? null,
-      })
-      .run();
+      });
 
     if (body.checklist?.length) {
       for (let i = 0; i < body.checklist.length; i++) {
         const item = body.checklist[i];
-        db.insert(taskChecklistItems)
+        await db.insert(taskChecklistItems)
           .values({
             id: item.id,
             taskId: body.id,
             text: item.text,
             status: item.status,
             sortOrder: i,
-          })
-          .run();
+          });
       }
     }
 
-    db.insert(events)
-      .values({
-        id: `ev-${Date.now()}`,
-        type: "command",
-        message: `Tarea creada: "${body.title}"`,
-      })
-      .run();
+    await logDockEvent("command", `Tarea creada: "${body.title}"`);
 
-    const inserted = db.select().from(tasks).where(eq(tasks.id, body.id)).get();
-    const checklist = db
+    const [inserted] = await db.select().from(tasks).where(eq(tasks.id, body.id)).limit(1);
+    const checklist = await db
       .select()
       .from(taskChecklistItems)
-      .where(eq(taskChecklistItems.taskId, body.id))
-      .all();
+      .where(eq(taskChecklistItems.taskId, body.id));
 
     return NextResponse.json({
       ok: true,

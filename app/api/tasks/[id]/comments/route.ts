@@ -13,12 +13,11 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const rows = db
+    const rows = await db
       .select()
       .from(cardComments)
       .where(eq(cardComments.cardId, id))
-      .orderBy(desc(cardComments.createdAt))
-      .all();
+      .orderBy(desc(cardComments.createdAt));
 
     const comments: CardComment[] = rows.map((r) => ({
       id: r.id,
@@ -46,7 +45,7 @@ export async function POST(
     const { id } = await params;
     const body = await req.json();
 
-    const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!task) {
       return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
@@ -64,15 +63,14 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
-    db.insert(cardComments)
+    await db.insert(cardComments)
       .values({
         id: comment.id,
         cardId: comment.cardId,
         author: comment.author,
         body: comment.body,
         type: comment.type,
-      })
-      .run();
+      });
 
     return NextResponse.json({ ok: true, comment });
   } catch (err) {

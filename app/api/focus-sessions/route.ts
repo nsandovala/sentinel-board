@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { focusSessions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { logDockEvent } from "@/lib/server/log-event";
 
 export const dynamic = "force-dynamic";
 
@@ -28,24 +29,29 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "start") {
       const id = `fs-${Date.now()}`;
-      db.insert(focusSessions)
+      await db.insert(focusSessions)
         .values({
           id,
           project: body.project ?? null,
           state: "running",
           startedAt: now,
           elapsedSeconds: 0,
-        })
-        .run();
+        });
+
+      const label = body.project
+        ? `Foco iniciado en ${body.project}`
+        : "Foco iniciado";
+      await logDockEvent("focus", label);
+
       return NextResponse.json({ ok: true, id, state: "running" });
     }
 
-    const current = db
+    const [current] = await db
       .select()
       .from(focusSessions)
       .where(eq(focusSessions.state, "running"))
       .orderBy(desc(focusSessions.startedAt))
-      .get();
+      .limit(1);
 
     if (!current) {
       return NextResponse.json(
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     let newState: SessionState = current.state as SessionState;
-    const updates: Record<string, unknown> = {};
+    const updates: Partial<typeof focusSessions.$inferInsert> = {};
 
     if (body.action === "end") {
       newState = "ended";
@@ -75,10 +81,24 @@ export async function POST(req: NextRequest) {
       updates.state = "running";
     }
 
-    db.update(focusSessions)
+    await db.update(focusSessions)
       .set(updates)
-      .where(eq(focusSessions.id, current.id))
-      .run();
+      .where(eq(focusSessions.id, current.id));
+
+    const proj = current.project;
+    if (body.action === "end") {
+      const mins = body.elapsedSeconds != null
+        ? Math.floor(body.elapsedSeconds / 60)
+        : 0;
+      const msg = proj
+        ? `Foco terminado — ${mins} min en ${proj}`
+        : `Foco terminado — ${mins} min`;
+      await logDockEvent("focus", msg);
+    } else if (body.action === "pause") {
+      await logDockEvent("focus", proj ? `Foco pausado en ${proj}` : "Foco pausado");
+    } else if (body.action === "resume") {
+      await logDockEvent("focus", proj ? `Foco reanudado en ${proj}` : "Foco reanudado");
+    }
 
     return NextResponse.json({ ok: true, id: current.id, state: newState });
   } catch (err) {
@@ -91,12 +111,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const rows = db
+    const rows = await db
       .select()
       .from(focusSessions)
       .orderBy(desc(focusSessions.startedAt))
-      .limit(20)
-      .all();
+      .limit(20);
     return NextResponse.json({ ok: true, sessions: rows });
   } catch (err) {
     return NextResponse.json(

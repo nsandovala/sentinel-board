@@ -2,25 +2,34 @@
  * Seed script — populates the DB with the existing mock data.
  * Run: npm run db:seed
  */
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { config as loadEnv } from "dotenv";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import {
+  cardComments,
+  dockCommands,
+  focusSessions,
   projects,
   tasks,
   taskChecklistItems,
   events,
 } from "./schema";
 
-const DATA_DIR = join(process.cwd(), "data");
-const DB_PATH = join(DATA_DIR, "sentinel.db");
-mkdirSync(DATA_DIR, { recursive: true });
+loadEnv({ path: ".env.local" });
+loadEnv();
 
-const sqlite = new Database(DB_PATH);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
-const db = drizzle(sqlite);
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required to seed the Postgres database. Define it in .env.local or .env.");
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl:
+    process.env.DATABASE_URL.includes("sslmode=require") || process.env.DATABASE_URL.includes("neon.tech")
+      ? { rejectUnauthorized: false }
+      : undefined,
+});
+const db = drizzle(pool);
 
 // ── Mock data (inlined to avoid @/ alias issues in standalone scripts) ──────
 
@@ -334,18 +343,21 @@ const MOCK_EVENTS = [
 
 // ── Seed ────────────────────────────────────────────────────────────────────
 
-function seed() {
+async function seed() {
   console.log("Seeding Sentinel Board DB…");
 
   // Clear existing data (order matters for FK)
-  db.delete(taskChecklistItems).run();
-  db.delete(events).run();
-  db.delete(tasks).run();
-  db.delete(projects).run();
+  await db.delete(cardComments);
+  await db.delete(taskChecklistItems);
+  await db.delete(dockCommands);
+  await db.delete(focusSessions);
+  await db.delete(events);
+  await db.delete(tasks);
+  await db.delete(projects);
 
   // Projects
   for (const p of MOCK_PROJECTS) {
-    db.insert(projects)
+    await db.insert(projects)
       .values({
         id: p.id,
         name: p.name,
@@ -353,15 +365,14 @@ function seed() {
         repoUrl: p.repoUrl,
         color: p.color,
         status: p.status,
-      })
-      .run();
+      });
   }
   console.log(`  ✓ ${MOCK_PROJECTS.length} proyectos`);
 
   // Tasks + checklist items
   let checklistCount = 0;
   for (const c of MOCK_CARDS) {
-    db.insert(tasks)
+    await db.insert(tasks)
       .values({
         id: c.id,
         title: c.title,
@@ -372,20 +383,18 @@ function seed() {
         tags: c.tags,
         projectId: c.projectId,
         blocked: c.blocked,
-      })
-      .run();
+      });
 
     for (let i = 0; i < c.checklist.length; i++) {
       const item = c.checklist[i];
-      db.insert(taskChecklistItems)
+      await db.insert(taskChecklistItems)
         .values({
           id: item.id,
           taskId: c.id,
           text: item.text,
           status: item.status as "pending" | "in_progress" | "review" | "blocked" | "done",
           sortOrder: i,
-        })
-        .run();
+        });
       checklistCount++;
     }
   }
@@ -393,14 +402,18 @@ function seed() {
 
   // Events
   for (const e of MOCK_EVENTS) {
-    db.insert(events)
-      .values({ id: e.id, type: e.type, message: e.message })
-      .run();
+    await db.insert(events).values({ id: e.id, type: e.type, message: e.message });
   }
   console.log(`  ✓ ${MOCK_EVENTS.length} eventos`);
 
   console.log("Seed completo.");
 }
 
-seed();
-sqlite.close();
+seed()
+  .catch((error) => {
+    console.error("Seed failed:", error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await pool.end();
+  });
