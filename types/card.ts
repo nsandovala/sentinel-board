@@ -31,15 +31,26 @@ export interface FiveWhysData {
   rootCause?: string;
 }
 
+export type MoneyClassification = "core" | "quick_win" | "apuesta" | "ruido";
+
 export interface MoneyCodeData {
-  impact: number;
-  urgency: number;
-  effort: number;
-  returnValue: number;
-  strategyAlignment: number;
-  reuseValue: number;
-  validationValue: number;
-  score?: number;
+  revenue: number;
+  savings: number;
+  automation: number;
+  reuse: number;
+  validation: number;
+  execution: number;
+  score: number;
+  classification: MoneyClassification;
+  rationale: string;
+  /** @deprecated v1 fields kept for DB compat — ignore in new code */
+  impact?: number;
+  urgency?: number;
+  effort?: number;
+  returnValue?: number;
+  strategyAlignment?: number;
+  reuseValue?: number;
+  validationValue?: number;
 }
 
 export interface SentinelCard {
