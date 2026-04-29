@@ -23,7 +23,6 @@ import {
   nextCardId,
 } from "@/lib/console/command-executor";
 import { areTaskTitlesDuplicateOrSimilar } from "@/lib/console/local-analysis";
-import { mockSuggestions } from "@/lib/console/mock-events";
 import { createEvent } from "@/lib/state/sentinel-reducer";
 import { runLocalAnalysis, type LocalAnalysisResult } from "@/lib/console/local-analysis";
 import {
@@ -36,6 +35,7 @@ import { useToast } from "@/components/ui/toast";
 
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import type { SentinelCard } from "@/types/card";
+import type { HeoSuggestion } from "@/types/event";
 
 const LIVE_INTENT_ES: Record<CommandIntent, string> = {
   create_task: "Crear tarea",
@@ -57,6 +57,55 @@ const ANALYZE_EXAMPLES = [
 
 const ANALYZE_MODE_HINT =
   "Heurístico local (sin red): abajo podés crear tarjetas en backlog o copiar el informe.";
+
+function buildLiveSuggestions(
+  cards: SentinelCard[],
+  selectedProjectId: string | null,
+  projectName?: string,
+): HeoSuggestion[] {
+  const scoped = selectedProjectId ? cards.filter((card) => card.projectId === selectedProjectId) : cards;
+  const suggestions: HeoSuggestion[] = [];
+
+  const blocked = scoped.find((card) => card.blocked);
+  if (blocked) {
+    suggestions.push({
+      id: `heo-blocked-${blocked.id}`,
+      text: `Destrabar «${blocked.title}»`,
+      command: `mover "${blocked.title}" a clarificando`,
+    });
+  }
+
+  const backlog = scoped.find((card) => card.status === "idea_bruta");
+  if (backlog) {
+    suggestions.push({
+      id: `heo-backlog-${backlog.id}`,
+      text: `Aterrizar «${backlog.title}»`,
+      command: `mover "${backlog.title}" a clarificando`,
+    });
+  }
+
+  const inFlight = scoped.find((card) =>
+    card.status === "en_proceso" || card.status === "desarrollo" || card.status === "qa",
+  );
+  if (inFlight) {
+    const nextStatus = inFlight.status === "qa" ? "listo" : "qa";
+    suggestions.push({
+      id: `heo-inflight-${inFlight.id}`,
+      text: `Empujar «${inFlight.title}» a ${nextStatus}`,
+      command: `mover "${inFlight.title}" a ${nextStatus}`,
+    });
+  }
+
+  if (projectName) {
+    suggestions.push({
+      id: `heo-focus-${selectedProjectId ?? "global"}`,
+      text: `Abrir foco en ${projectName}`,
+      command: `iniciar foco en ${projectName}`,
+    });
+  }
+
+  return suggestions.slice(0, 4);
+}
 
 function buildAnalysisBacklogCard(title: string, projectId: string): SentinelCard {
   const t = title.replace(/\s+/g, " ").trim().slice(0, 200) || "Tarea desde análisis";
@@ -322,6 +371,13 @@ export function CommandDock() {
   const dispatch = useSentinelDispatch();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const focusRunning = state.focusSession.state === "running";
+  const defaultProjectId = state.selectedProjectId ?? state.projects[0]?.id ?? null;
+  const defaultProjectName =
+    state.projects.find((project) => project.id === defaultProjectId)?.name ?? undefined;
+  const liveSuggestions = useMemo(
+    () => buildLiveSuggestions(state.cards, state.selectedProjectId, defaultProjectName),
+    [defaultProjectName, state.cards, state.selectedProjectId],
+  );
 
   const tabHints = useMemo(() => {
     const firstName = state.projects[0]?.name ?? "MiProyecto";
@@ -511,22 +567,11 @@ export function CommandDock() {
 
   const handleFocusStart = useCallback(() => {
     dispatch({ type: "START_FOCUS" });
-    fetch("/api/focus-sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start" }),
-    }).catch(() => {});
   }, [dispatch]);
 
   const handleFocusEnd = useCallback(() => {
-    const elapsed = state.focusSession.elapsed;
     dispatch({ type: "END_FOCUS" });
-    fetch("/api/focus-sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "end", elapsedSeconds: elapsed }),
-    }).catch(() => {});
-  }, [dispatch, state.focusSession.elapsed]);
+  }, [dispatch]);
 
   const notify = useCallback(
     (message: string) => {
@@ -534,9 +579,6 @@ export function CommandDock() {
     },
     [dispatch],
   );
-
-  const defaultProjectId = state.projects[0]?.id ?? null;
-  const defaultProjectName = state.projects[0]?.name;
 
   return (
     <>
@@ -670,7 +712,7 @@ export function CommandDock() {
             </div>
 
             <div className="flex w-56 flex-col gap-4">
-              <CommandSuggestions suggestions={mockSuggestions} onSelect={runCommandLine} />
+              <CommandSuggestions suggestions={liveSuggestions} onSelect={runCommandLine} />
               <QuickActions
                 onFocusStart={handleFocusStart}
                 onFocusEnd={handleFocusEnd}
