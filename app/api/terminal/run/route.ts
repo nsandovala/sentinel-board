@@ -21,11 +21,15 @@ import {
   runTerminalCommand,
   type TerminalRunInput,
 } from "@/lib/server/terminal-runner";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const body = await req.json();
 
     const command = typeof body?.command === "string" ? body.command.trim() : "";

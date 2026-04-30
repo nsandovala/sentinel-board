@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeEntries } from "@/lib/db/schema";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { KnowledgeEntry } from "@/types/knowledge";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +74,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const body = (await req.json()) as Partial<KnowledgeEntry>;
 
     if (!body.id || !body.title || !body.slug || !body.body) {

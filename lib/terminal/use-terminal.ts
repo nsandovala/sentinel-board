@@ -9,7 +9,7 @@
  * Input:  User commands typed in the terminal
  * Output: AI responses rendered in xterm, plus status/provider state
  *
- * Dependency: /api/terminal/run → lib/server/terminal-runner → lib/ai/ai-router
+ * Dependency: /api/terminal/run -> lib/server/terminal-runner -> lib/ai/ai-router
  *
  * Risks:
  * - Long-running requests block the UI feedback loop. Phase 2 should
@@ -64,7 +64,7 @@ export function useTerminal(onRefresh?: () => void) {
     termRef.current?.clear();
   }, []);
 
-  const executeCommand = useCallback((input: string) => {
+  const executeCommand = (input: string) => {
     const term = termRef.current;
     if (!term) return;
 
@@ -76,7 +76,7 @@ export function useTerminal(onRefresh?: () => void) {
       return;
     }
 
-    term.writeln(`${ANSI.cyan}${ANSI.bold}❯${ANSI.reset} ${trimmed}`);
+    term.writeln(`${ANSI.cyan}${ANSI.bold}>${ANSI.reset} ${trimmed}`);
     term.writeln(`${ANSI.dim}Ejecutando...${ANSI.reset}`);
 
     setState({ status: "running", provider: null });
@@ -118,17 +118,17 @@ export function useTerminal(onRefresh?: () => void) {
           }
 
           const providerLabel = data.provider === "local" ? "local" : data.provider;
-          term.writeln(`${ANSI.dim}  ✓ ${providerLabel} · ${data.durationMs ?? 0}ms${ANSI.reset}`);
+          term.writeln(`${ANSI.dim}  ok ${providerLabel} | ${data.durationMs ?? 0}ms${ANSI.reset}`);
 
           if (data.hint === "refresh_board") {
-            term.writeln(`${ANSI.yellow}  ↻ Sincronizando board...${ANSI.reset}`);
+            term.writeln(`${ANSI.yellow}  sync board...${ANSI.reset}`);
             onRefresh?.();
           }
 
           setState({ status: "success", provider: data.provider });
         } else {
           const errMsg = data.error ?? "Sin respuesta del provider";
-          term.writeln(`${ANSI.red}  ✗ ${errMsg}${ANSI.reset}`);
+          term.writeln(`${ANSI.red}  x ${errMsg}${ANSI.reset}`);
           if (data.durationMs) {
             term.writeln(`${ANSI.dim}  ${data.durationMs}ms${ANSI.reset}`);
           }
@@ -139,11 +139,11 @@ export function useTerminal(onRefresh?: () => void) {
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : "Error de red";
-        term.writeln(`${ANSI.red}  ✗ ${message}${ANSI.reset}`);
+        term.writeln(`${ANSI.red}  x ${message}${ANSI.reset}`);
         term.writeln("");
         setState({ status: "error", provider: null });
       });
-  }, []);
+  };
 
   const handle: TerminalHandle = { appendLog, clearTerminal, executeCommand };
 

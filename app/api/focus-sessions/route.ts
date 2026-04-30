@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { focusSessions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { logDockEvent } from "@/lib/server/log-event";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ interface FocusSessionBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const body = (await req.json()) as FocusSessionBody;
 
     if (!body.action) {
@@ -46,10 +50,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, id, state: "running" });
     }
 
+    const requiredState = body.action === "resume" ? "paused" : "running";
+
     const [current] = await db
       .select()
       .from(focusSessions)
-      .where(eq(focusSessions.state, "running"))
+      .where(eq(focusSessions.state, requiredState))
       .orderBy(desc(focusSessions.startedAt))
       .limit(1);
 

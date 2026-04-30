@@ -12,7 +12,7 @@
  * No dependencies on AI, store, or DB — pure parsing.
  */
 
-export type ActionType = "GET_TOP_PRIORITY" | "MOVE_CARD" | "GET_TIME";
+export type ActionType = "GET_TOP_PRIORITY" | "MOVE_CARD" | "GET_TIME" | "LIST_TASKS" | "DELETE_CARD" | "ANALYZE_ROOT_CAUSE";
 
 export interface ResolvedAction {
   type: ActionType;

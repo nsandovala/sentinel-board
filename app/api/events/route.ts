@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { events } from "@/lib/db/schema";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { DockEvent } from "@/types/event";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const body = (await req.json()) as { type?: string; message?: string };
     if (!body.type || !body.message) {
       return NextResponse.json(

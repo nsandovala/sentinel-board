@@ -1,4 +1,4 @@
-import type { SentinelCard, MoneyCodeData } from "@/types/card";
+import type { MoneyClassification, SentinelCard, MoneyCodeData } from "@/types/card";
 
 const PRIORITY_IMPACT: Record<string, number> = {
   critical: 10,
@@ -32,6 +32,13 @@ const TYPE_RETURN: Record<string, number> = {
 
 function clamp(v: number, min = 1, max = 10): number {
   return Math.max(min, Math.min(max, Math.round(v)));
+}
+
+function classify(score: number): MoneyClassification {
+  if (score >= 80) return "core";
+  if (score >= 60) return "quick_win";
+  if (score >= 40) return "apuesta";
+  return "ruido";
 }
 
 export function generateMoneyCode(card: SentinelCard): MoneyCodeData {
@@ -73,7 +80,25 @@ export function generateMoneyCode(card: SentinelCard): MoneyCodeData {
 
   const score = Math.round(raw * 10);
 
+  const revenue = impact;
+  const savings = returnValue;
+  const automation = urgency;
+  const reuse = reuseValue;
+  const execution = effort;
+  const validation = validationValue;
+  const classification = classify(score);
+  const rationale = `Score ${score}: impact=${impact}, urgency=${urgency}, effort=${effort}, return=${returnValue}, alignment=${strategyAlignment}, reuse=${reuseValue}, validation=${validationValue}`;
+
   return {
+    revenue,
+    savings,
+    automation,
+    reuse,
+    execution,
+    validation,
+    score,
+    classification,
+    rationale,
     impact,
     urgency,
     effort,
@@ -81,6 +106,5 @@ export function generateMoneyCode(card: SentinelCard): MoneyCodeData {
     strategyAlignment,
     reuseValue,
     validationValue,
-    score,
   };
 }

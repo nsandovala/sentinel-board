@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { cardComments, tasks } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { CardComment } from "@/types/comment";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const { id } = await params;
     const body = await req.json();
 

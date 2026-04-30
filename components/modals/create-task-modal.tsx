@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -34,18 +34,13 @@ export function CreateTaskModal({ open, onOpenChange }: CreateTaskModalProps) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [type, setType] = useState<CardType>("task");
   const [priority, setPriority] = useState<PriorityLevel>("medium");
-
-  useEffect(() => {
-    if (open && projects.length && !projectId) {
-      setProjectId(projects[0].id);
-    }
-  }, [open, projects, projectId]);
+  const effectiveProjectId = projectId || projects[0]?.id || "";
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       const t = title.trim();
-      if (!t || !projectId) return;
+      if (!t || !effectiveProjectId) return;
 
       const card: SentinelCard = {
         id: nextCardId(),
@@ -55,7 +50,7 @@ export function CreateTaskModal({ open, onOpenChange }: CreateTaskModalProps) {
         type,
         priority,
         tags: [],
-        projectId,
+        projectId: effectiveProjectId,
         checklist: [],
         blocked: false,
       };
@@ -67,7 +62,7 @@ export function CreateTaskModal({ open, onOpenChange }: CreateTaskModalProps) {
       setDescription("");
       onOpenChange(false);
     },
-    [title, description, projectId, type, priority, dispatch, onOpenChange],
+    [title, description, effectiveProjectId, type, priority, dispatch, onOpenChange],
   );
 
   if (!open) return null;
@@ -131,7 +126,7 @@ export function CreateTaskModal({ open, onOpenChange }: CreateTaskModalProps) {
             </label>
             <select
               id="ct-proj"
-              value={projectId}
+              value={effectiveProjectId}
               onChange={(e) => setProjectId(e.target.value)}
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 dark:bg-input/30"
             >

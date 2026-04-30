@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,28 +18,25 @@ export function MoveStateModal({ open, onOpenChange }: MoveStateModalProps) {
   const dispatch = useSentinelDispatch();
   const [cardId, setCardId] = useState<string>("");
   const [status, setStatus] = useState<CardStatus>("en_proceso");
-
-  useEffect(() => {
-    if (!open) return;
-    const preferred =
-      (selectedCardId && cards.some((c) => c.id === selectedCardId) ? selectedCardId : null) ??
-      cards[0]?.id ??
-      "";
-    setCardId(preferred);
-    const current = cards.find((c) => c.id === preferred);
-    if (current) setStatus(current.status);
-  }, [open, selectedCardId, cards]);
+  const preferredCardId =
+    (selectedCardId && cards.some((c) => c.id === selectedCardId) ? selectedCardId : null) ??
+    cards[0]?.id ??
+    "";
+  const effectiveCardId = cardId || preferredCardId;
+  const preferredStatus =
+    cards.find((c) => c.id === effectiveCardId)?.status ?? "en_proceso";
+  const effectiveStatus = cardId ? status : preferredStatus;
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!cardId) return;
-      dispatch({ type: "MOVE_CARD", cardId, status });
+      if (!effectiveCardId) return;
+      dispatch({ type: "MOVE_CARD", cardId: effectiveCardId, status: effectiveStatus });
       dispatch({ type: "SET_VIEW", view: "board" });
-      dispatch({ type: "SELECT_CARD", cardId });
+      dispatch({ type: "SELECT_CARD", cardId: effectiveCardId });
       onOpenChange(false);
     },
-    [cardId, status, dispatch, onOpenChange],
+    [effectiveCardId, effectiveStatus, dispatch, onOpenChange],
   );
 
   if (!open) return null;
@@ -78,7 +75,7 @@ export function MoveStateModal({ open, onOpenChange }: MoveStateModalProps) {
             </label>
             <select
               id="mv-card"
-              value={cardId}
+              value={effectiveCardId}
               onChange={(e) => {
                 const id = e.target.value;
                 setCardId(id);
@@ -101,7 +98,7 @@ export function MoveStateModal({ open, onOpenChange }: MoveStateModalProps) {
             </label>
             <select
               id="mv-status"
-              value={status}
+              value={effectiveStatus}
               onChange={(e) => setStatus(e.target.value as CardStatus)}
               className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring dark:bg-input/30"
             >
@@ -117,7 +114,7 @@ export function MoveStateModal({ open, onOpenChange }: MoveStateModalProps) {
             <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" size="sm" disabled={!cardId}>
+            <Button type="submit" size="sm" disabled={!effectiveCardId}>
               Mover y ver board
             </Button>
           </div>

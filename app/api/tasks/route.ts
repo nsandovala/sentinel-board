@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { tasks, taskChecklistItems } from "@/lib/db/schema";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { logDockEvent } from "@/lib/server/log-event";
+import { rejectIfUnauthorized } from "@/lib/server/request-guard";
+import { validateTaskCreate } from "@/lib/server/task-validation";
 import type { SentinelCard } from "@/types/card";
 
 export const dynamic = "force-dynamic";
@@ -93,38 +95,44 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const denied = rejectIfUnauthorized(req);
+    if (denied) return denied;
+
     const body = (await req.json()) as Partial<SentinelCard>;
-    if (!body.id || !body.title || !body.projectId) {
+    const normalized = validateTaskCreate(body);
+    if (!normalized.ok) {
       return NextResponse.json(
-        { ok: false, error: "id, title, and projectId are required" },
+        { ok: false, error: normalized.error },
         { status: 400 },
       );
     }
 
+    const task = normalized.value;
+
     await db.insert(tasks)
       .values({
-        id: body.id,
-        title: body.title,
-        description: body.description ?? null,
-        status: body.status ?? "idea_bruta",
-        type: body.type ?? "task",
-        priority: body.priority ?? "medium",
-        tags: body.tags ?? [],
-        projectId: body.projectId,
-        blocked: body.blocked ?? false,
-        blockerReason: body.blockerReason ?? null,
-        codexLoop: (body.codexLoop as Record<string, string | undefined>) ?? null,
-        fiveWhys: (body.fiveWhys as Record<string, string | undefined>) ?? null,
-        moneyCode: (body.moneyCode as unknown as Record<string, number | undefined>) ?? null,
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        type: task.type,
+        priority: task.priority,
+        tags: task.tags,
+        projectId: task.projectId,
+        blocked: task.blocked,
+        blockerReason: task.blockerReason,
+        codexLoop: task.codexLoop,
+        fiveWhys: task.fiveWhys,
+        moneyCode: task.moneyCode,
       });
 
-    if (body.checklist?.length) {
-      for (let i = 0; i < body.checklist.length; i++) {
-        const item = body.checklist[i];
+    if (task.checklist.length) {
+      for (let i = 0; i < task.checklist.length; i++) {
+        const item = task.checklist[i];
         await db.insert(taskChecklistItems)
           .values({
             id: item.id,
-            taskId: body.id,
+            taskId: task.id,
             text: item.text,
             status: item.status,
             sortOrder: i,
@@ -132,13 +140,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await logDockEvent("command", `Tarea creada: "${body.title}"`);
+    await logDockEvent("command", `Tarea creada: "${task.title}"`);
 
-    const [inserted] = await db.select().from(tasks).where(eq(tasks.id, body.id)).limit(1);
+    const [inserted] = await db.select().from(tasks).where(eq(tasks.id, task.id)).limit(1);
     const checklist = await db
       .select()
       .from(taskChecklistItems)
-      .where(eq(taskChecklistItems.taskId, body.id));
+      .where(eq(taskChecklistItems.taskId, task.id));
 
     return NextResponse.json({
       ok: true,

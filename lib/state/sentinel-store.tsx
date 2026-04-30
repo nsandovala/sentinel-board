@@ -180,7 +180,10 @@ async function loadCardComments(
 export function SentinelProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(sentinelReducer, initialState);
   const stateRef = useRef(state);
-  stateRef.current = state;
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const dispatch: Dispatch<SentinelAction> = useCallback(
     (action: SentinelAction) => {
