@@ -33,9 +33,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 
-import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import { useSentinel, useSentinelDispatch, useSentinelRefresh } from "@/lib/state/sentinel-store";
 import type { SentinelCard } from "@/types/card";
 import type { HeoSuggestion } from "@/types/event";
+import type { Project } from "@/types/project";
 
 const LIVE_INTENT_ES: Record<CommandIntent, string> = {
   create_task: "Crear tarea",
@@ -122,6 +123,8 @@ function buildAnalysisBacklogCard(title: string, projectId: string): SentinelCar
   };
 }
 
+void buildAnalysisBacklogCard;
+
 function formatAnalysisExport(data: LocalAnalysisResult): string {
   const cl = data.codexLoop;
   const blocks: string[] = [
@@ -151,6 +154,7 @@ function formatAnalysisExport(data: LocalAnalysisResult): string {
 function AnalysisPreview({
   data,
   cards,
+  projects,
   projectId,
   projectName,
   onNotify,
@@ -158,12 +162,14 @@ function AnalysisPreview({
 }: {
   data: LocalAnalysisResult;
   cards: SentinelCard[];
+  projects: Project[];
   projectId: string | null;
   projectName?: string;
   onNotify: (message: string) => void;
   isAgentResult?: boolean;
 }) {
   const { toast } = useToast();
+  const refresh = useSentinelRefresh();
   const cl = data.codexLoop;
   const loopFields: { label: string; value?: string }[] = [
     { label: "Problema", value: cl.problem },
@@ -174,11 +180,55 @@ function AnalysisPreview({
     { label: "Siguiente paso", value: cl.nextStep },
   ];
 
-  const canAct = Boolean(projectId);
   const dispatch = useSentinelDispatch();
+  const selectedProject = projectId
+    ? projects.find((project) => project.id === projectId)
+    : undefined;
+  const canAct = Boolean(projectId && selectedProject?.slug);
+  const [savingTitles, setSavingTitles] = useState<string[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const logSkip = (line: string) => {
     dispatch({ type: "ADD_EVENT", event: createEvent("system", line) });
+  };
+
+  const buildBackendContent = (title: string) =>
+    [
+      "Idea capturada desde ANALIZAR",
+      `Titulo backlog: ${title}`,
+      `Proyecto: ${selectedProject?.name ?? projectName ?? "sin proyecto"}`,
+      "",
+      "Resumen generado:",
+      data.summary,
+      "",
+      "Texto fuente:",
+      data.sourceText,
+    ].join("\n");
+
+  const createViaBackend = async (title: string) => {
+    if (!selectedProject?.slug) {
+      throw new Error("No hay proyecto seleccionado para persistir la idea.");
+    }
+
+    const response = await fetch("/api/agent-inputs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "manual",
+        projectSlug: selectedProject.slug,
+        title,
+        content: buildBackendContent(title),
+        tags: [isAgentResult ? "planner" : "analisis-local", "from-analyze"],
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; error?: string }
+      | null;
+
+    if (!response.ok || !payload?.ok) {
+      throw new Error(payload?.error ?? `HTTP ${response.status}`);
+    }
   };
 
   const copyAll = async (e: React.MouseEvent) => {
@@ -191,8 +241,8 @@ function AnalysisPreview({
     }
   };
 
-  const addOne = (title: string) => {
-    if (!projectId) {
+  const addOne = async (title: string) => {
+    if (!projectId || !selectedProject?.slug) {
       onNotify("No hay proyecto: no se puede crear la tarjeta.");
       return;
     }
@@ -205,17 +255,34 @@ function AnalysisPreview({
       onNotify("No se creó: duplicado o casi igual a una tarjeta del proyecto (detalle en registro).");
       return;
     }
-    dispatch({ type: "CREATE_CARD", card: buildAnalysisBacklogCard(trimmed, projectId) });
+    setSavingTitles((current) =>
+      current.includes(trimmed) ? current : [...current, trimmed],
+    );
+    try {
+      await createViaBackend(trimmed);
+      refresh();
+      onNotify(
+        `Idea guardada en backlog${projectName ? ` de Â«${projectName}Â»` : ""} vÃ­a backend real.`,
+      );
+    } catch (err) {
+      onNotify(
+        `No se pudo crear en board: ${err instanceof Error ? err.message : "error desconocido"}.`,
+      );
+    } finally {
+      setSavingTitles((current) => current.filter((item) => item !== trimmed));
+    }
     onNotify(`Tarjeta añadida al backlog (idea bruta)${projectName ? ` en «${projectName}»` : ""}.`);
   };
 
-  const addAllTasks = () => {
-    if (!projectId) {
+  const addAllTasks = async () => {
+    if (!projectId || !selectedProject?.slug) {
       onNotify("No hay proyecto: no se puede crear la tarjeta.");
       return;
     }
+    setBulkSaving(true);
     const createdInBatch: string[] = [];
     let n = 0;
+    try {
     for (const t of data.tasks) {
       const trimmed = t.replace(/\s+/g, " ").trim();
       if (!trimmed) continue;
@@ -232,9 +299,26 @@ function AnalysisPreview({
         );
         continue;
       }
-      dispatch({ type: "CREATE_CARD", card: buildAnalysisBacklogCard(trimmed, projectId) });
-      createdInBatch.push(trimmed);
-      n++;
+      setSavingTitles((current) =>
+        current.includes(trimmed) ? current : [...current, trimmed],
+      );
+      try {
+        await createViaBackend(trimmed);
+        createdInBatch.push(trimmed);
+        n++;
+      } finally {
+        setSavingTitles((current) => current.filter((item) => item !== trimmed));
+      }
+    }
+    } catch (err) {
+      onNotify(
+        `El lote se interrumpiÃ³: ${err instanceof Error ? err.message : "error desconocido"}.`,
+      );
+    } finally {
+      setBulkSaving(false);
+    }
+    if (n > 0) {
+      refresh();
     }
     onNotify(
       n ? `${n} tarjeta(s) añadidas al backlog.` : "Ninguna tarea nueva: todas estaban duplicadas o vacías.",
@@ -291,12 +375,12 @@ function AnalysisPreview({
           {data.tasks.length > 1 ? (
             <button
               type="button"
-              disabled={!canAct}
+              disabled={!canAct || bulkSaving}
               onClick={addAllTasks}
               title={!canAct ? "Falta proyecto en el tablero" : undefined}
               className="rounded-md border border-border/40 bg-muted/90 px-2 py-0.5 text-[10px] font-medium text-foreground/85 shadow-[inset_0_1px_0_oklch(0.6_0.014_285/0.05)] transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Todas al backlog
+              {bulkSaving ? "Guardando..." : "Todas al backlog"}
             </button>
           ) : null}
         </div>
@@ -304,22 +388,25 @@ function AnalysisPreview({
           <p className="text-[10px] text-muted-foreground">Necesitás al menos un proyecto en el tablero para crear tarjetas.</p>
         ) : null}
         <ul className="mt-1 space-y-1.5">
-          {data.tasks.map((t, i) => (
-            <li
-              key={`${i}-${t.slice(0, 24)}`}
-              className="sentinel-glass-panel--subtle flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span className="text-[12px] leading-snug text-foreground/85">{t}</span>
-              <button
-                type="button"
-                disabled={!canAct}
-                onClick={() => addOne(t)}
-                className="shrink-0 self-start rounded-md border border-border/35 bg-background/85 px-2 py-0.5 text-[10px] font-medium text-foreground/80 shadow-[inset_0_1px_0_oklch(0.55_0.012_285/0.05)] transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 sm:self-center"
+          {data.tasks.map((t, i) => {
+            const saving = savingTitles.includes(t.replace(/\s+/g, " ").trim());
+            return (
+              <li
+                key={`${i}-${t.slice(0, 24)}`}
+                className="sentinel-glass-panel--subtle flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between"
               >
-                Crear en board
-              </button>
-            </li>
-          ))}
+                <span className="text-[12px] leading-snug text-foreground/85">{t}</span>
+                <button
+                  type="button"
+                  disabled={!canAct || saving || bulkSaving}
+                  onClick={() => void addOne(t)}
+                  className="shrink-0 self-start rounded-md border border-border/35 bg-background/85 px-2 py-0.5 text-[10px] font-medium text-foreground/80 shadow-[inset_0_1px_0_oklch(0.55_0.012_285/0.05)] transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40 sm:self-center"
+                >
+                  {saving ? "Guardando..." : "Crear en board"}
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {data.tasks.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">No se extrajeron ítems concretos; reintenta con viñetas o frases más cortas.</p>
@@ -702,6 +789,7 @@ export function CommandDock() {
                   <AnalysisPreview
                     data={lastAnalysis}
                     cards={state.cards}
+                    projects={state.projects}
                     projectId={defaultProjectId}
                     projectName={defaultProjectName}
                     onNotify={notify}

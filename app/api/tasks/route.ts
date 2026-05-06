@@ -5,6 +5,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { logDockEvent } from "@/lib/server/log-event";
 import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import { validateTaskCreate } from "@/lib/server/task-validation";
+import { extractCardMetadata } from "@/lib/analysis/card-metadata";
 import type { SentinelCard } from "@/types/card";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ function assembleCard(
   row: typeof tasks.$inferSelect,
   checklist: (typeof taskChecklistItems.$inferSelect)[],
 ): SentinelCard {
-  return {
+  const card: SentinelCard = {
     id: row.id,
     title: row.title,
     description: row.description ?? undefined,
@@ -35,6 +36,11 @@ function assembleCard(
     blocked: row.blocked,
     blockerReason: row.blockerReason ?? undefined,
     createdAt: row.createdAt,
+  };
+
+  return {
+    ...card,
+    metadata: extractCardMetadata(card),
   };
 }
 

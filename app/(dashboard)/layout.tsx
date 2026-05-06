@@ -6,7 +6,11 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { RightPanel } from "@/components/layout/right-panel";
 import { CommandDock } from "@/components/console/command-dock";
-import { SentinelProvider, useSentinelRefresh } from "@/lib/state/sentinel-store";
+import {
+  SentinelProvider,
+  useSentinelDispatch,
+  useSentinelRefresh,
+} from "@/lib/state/sentinel-store";
 import { ToastProvider } from "@/components/ui/toast";
 import { useTerminal } from "@/lib/terminal/use-terminal";
 
@@ -18,7 +22,17 @@ const TerminalPanel = dynamic(
 function DashboardShell({ children }: { children: React.ReactNode }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const refresh = useSentinelRefresh();
-  const { setTerminal, handle, state: terminalState } = useTerminal(refresh);
+  const dispatch = useSentinelDispatch();
+  const { setTerminal, handle, state: terminalState } = useTerminal({
+    onRefresh: refresh,
+    onOpenCard: (cardId, projectId) => {
+      if (projectId) {
+        dispatch({ type: "SELECT_PROJECT", projectId });
+      }
+      dispatch({ type: "SET_VIEW", view: "board" });
+      dispatch({ type: "SELECT_CARD", cardId });
+    },
+  });
 
   const onTerminalReady = useCallback(
     (term: import("@xterm/xterm").Terminal) => {
@@ -54,6 +68,8 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           executeCommand={handle.executeCommand}
           status={terminalState.status}
           provider={terminalState.provider}
+          mode={terminalState.mode}
+          connected={terminalState.connected}
         />
       )}
       <CommandDock />

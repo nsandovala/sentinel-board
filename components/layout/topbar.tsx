@@ -278,7 +278,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
           className="gap-1.5 border-border/40 bg-card text-[13px] text-muted-foreground hover:bg-muted/80 hover:text-foreground"
         >
           <Filter className="h-3.5 w-3.5" />
-          Filtrar
+          Filtrar tareas
           {activeFilterCount > 0 && (
             <span className="rounded bg-muted px-1 text-[10px] text-foreground">
               {activeFilterCount}
@@ -320,21 +320,35 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
       </div>
 
       <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
-        <SheetContent side="right" className="w-[24rem] sm:max-w-[24rem]">
+        <SheetContent
+          side="right"
+          className="w-[24rem] border-l border-sidebar-border bg-sidebar text-sidebar-foreground sm:max-w-[24rem]"
+        >
           <SheetHeader>
             <SheetTitle>Filtros backend-first</SheetTitle>
             <SheetDescription>
-              Consulta real contra Postgres para tareas y documentación.
+              Estado, prioridad y tag filtran tareas. La búsqueda de texto abarca tareas y documentación.
             </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-4 px-4">
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/40 bg-muted/35 px-3 py-2 text-[11px] text-muted-foreground">
+              <div>
+                <span className="block font-medium text-foreground/85">Filtros visuales</span>
+                <span>Aplican sobre tasks.</span>
+              </div>
+              <div>
+                <span className="block font-medium text-foreground/85">Busqueda</span>
+                <span>Consulta tasks + knowledge.</span>
+              </div>
+            </div>
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground">Tag</label>
               <Input
                 value={tagFilter}
                 onChange={(e) => dispatch({ type: "SET_TAG_FILTER", value: e.target.value })}
                 placeholder="backend, neon, migracion..."
+                className="border-border/50 bg-background/70"
               />
             </div>
 
@@ -343,7 +357,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
               <select
                 value={statusFilter}
                 onChange={(e) => dispatch({ type: "SET_STATUS_FILTER", value: e.target.value })}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                className="h-8 w-full rounded-lg border border-input bg-background/70 px-2.5 text-sm text-foreground"
               >
                 <option value="">Todos</option>
                 <option value="idea_bruta">Idea bruta</option>
@@ -363,7 +377,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
               <select
                 value={priorityFilter}
                 onChange={(e) => dispatch({ type: "SET_PRIORITY_FILTER", value: e.target.value })}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                className="h-8 w-full rounded-lg border border-input bg-background/70 px-2.5 text-sm text-foreground"
               >
                 <option value="">Todas</option>
                 <option value="critical">Critical</option>

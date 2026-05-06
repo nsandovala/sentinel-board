@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", ".next", ".next.bak.codex", "sentinel-board"]
+  "exclude": ["node_modules", ".next", ".next.bak.codex", "sentinel-board", "sentinel-board-1"]
 }

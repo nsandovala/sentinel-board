@@ -7,6 +7,8 @@ export interface LocalAnalysisResult {
   risks: string[];
   nextSteps: string[];
   codexLoop: CodexLoopData;
+  /** Raw source text used to persist idea context into the backend */
+  sourceText: string;
   /** Short preview of input for the log */
   sourcePreview: string;
 }
@@ -116,6 +118,7 @@ export function runLocalAnalysis(raw: string): LocalAnalysisResult {
         projectId: "5",
         checklist: [],
       }),
+      sourceText: "",
       sourcePreview: "",
     };
   }
@@ -164,6 +167,7 @@ export function runLocalAnalysis(raw: string): LocalAnalysisResult {
     risks,
     nextSteps,
     codexLoop,
+    sourceText: text,
     sourcePreview,
   };
 }

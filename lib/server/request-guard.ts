@@ -9,6 +9,15 @@ function normalizeHost(hostHeader: string | null): string {
     .toLowerCase();
 }
 
+function normalizeUrlHost(urlValue: string | null): string {
+  if (!urlValue) return "";
+  try {
+    return new URL(urlValue).hostname.trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function extractClientIp(req: NextRequest): string {
   const forwardedFor = req.headers.get("x-forwarded-for");
   if (forwardedFor) {
@@ -32,6 +41,23 @@ function isLocalRequest(req: NextRequest): boolean {
   return isLoopbackHost(host) || isLoopbackIp(ip);
 }
 
+function isTrustedSameOriginBrowserRequest(req: NextRequest): boolean {
+  const host = normalizeHost(req.headers.get("host"));
+  if (!host) return false;
+
+  const originHost = normalizeUrlHost(req.headers.get("origin"));
+  const refererHost = normalizeUrlHost(req.headers.get("referer"));
+  const fetchSite = req.headers.get("sec-fetch-site")?.trim().toLowerCase();
+
+  const hasSameOriginSource =
+    (originHost && originHost === host) ||
+    (refererHost && refererHost === host);
+
+  if (!hasSameOriginSource) return false;
+
+  return !fetchSite || fetchSite === "same-origin";
+}
+
 function hasValidToken(req: NextRequest, expectedToken: string): boolean {
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
@@ -44,7 +70,7 @@ function hasValidToken(req: NextRequest, expectedToken: string): boolean {
 export function rejectIfUnauthorized(req: NextRequest): NextResponse | null {
   const configuredToken = process.env.SENTINEL_API_TOKEN?.trim();
 
-  if (isLocalRequest(req)) {
+  if (isLocalRequest(req) || isTrustedSameOriginBrowserRequest(req)) {
     return null;
   }
 
@@ -56,7 +82,7 @@ export function rejectIfUnauthorized(req: NextRequest): NextResponse | null {
     {
       ok: false,
       error:
-        "Protected endpoint. Use localhost or provide a valid SENTINEL_API_TOKEN.",
+        "Protected endpoint. Use localhost, the same web origin, or provide a valid SENTINEL_API_TOKEN.",
     },
     { status: 403 },
   );

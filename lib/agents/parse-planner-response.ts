@@ -113,6 +113,7 @@ export function plannerToLocalAnalysis(
     risks: planner.risks.length > 0 ? planner.risks : ["Sin riesgos identificados."],
     nextSteps: planner.next_steps.length > 0 ? planner.next_steps : [planner.objective],
     codexLoop,
+    sourceText,
     sourcePreview,
   };
 }

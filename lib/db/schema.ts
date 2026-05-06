@@ -32,9 +32,9 @@ export const tasks = pgTable("tasks", {
     .references(() => projects.id),
   blocked: boolean("blocked").notNull().default(false),
   blockerReason: text("blocker_reason"),
-  codexLoop: jsonb("codex_loop").$type<Record<string, string | undefined>>(),
-  fiveWhys: jsonb("five_whys").$type<Record<string, string | undefined>>(),
-  moneyCode: jsonb("money_code").$type<Record<string, number | undefined>>(),
+  codexLoop: jsonb("codex_loop").$type<Record<string, unknown>>(),
+  fiveWhys: jsonb("five_whys").$type<Record<string, unknown>>(),
+  moneyCode: jsonb("money_code").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
     .notNull()
     .defaultNow(),

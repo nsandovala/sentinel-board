@@ -1,27 +1,10 @@
 "use client";
 
-/**
- * use-terminal.ts
- *
- * Purpose: React hook that bridges the xterm.js terminal UI with the
- * server-side terminal runner via POST /api/terminal/run.
- *
- * Input:  User commands typed in the terminal
- * Output: AI responses rendered in xterm, plus status/provider state
- *
- * Dependency: /api/terminal/run -> lib/server/terminal-runner -> lib/ai/ai-router
- *
- * Risks:
- * - Long-running requests block the UI feedback loop. Phase 2 should
- *   switch to SSE/streaming for progressive output.
- * - No abort mechanism yet; a stuck request will resolve eventually
- *   via provider timeout (~30s).
- */
-
 import { useCallback, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 
 export type TerminalStatus = "idle" | "running" | "success" | "error";
+export type TerminalRuntimeMode = "local" | "agent";
 
 export interface TerminalHandle {
   appendLog: (line: string) => void;
@@ -32,6 +15,13 @@ export interface TerminalHandle {
 export interface TerminalState {
   status: TerminalStatus;
   provider: string | null;
+  mode: TerminalRuntimeMode;
+  connected: boolean;
+}
+
+interface UseTerminalOptions {
+  onRefresh?: () => void;
+  onOpenCard?: (cardId: string, projectId?: string) => void;
 }
 
 const ANSI = {
@@ -45,11 +35,13 @@ const ANSI = {
   bold: "\x1b[1m",
 } as const;
 
-export function useTerminal(onRefresh?: () => void) {
+export function useTerminal(options: UseTerminalOptions = {}) {
   const termRef = useRef<Terminal | null>(null);
   const [state, setState] = useState<TerminalState>({
     status: "idle",
-    provider: null,
+    provider: "local",
+    mode: "local",
+    connected: true,
   });
 
   const setTerminal = useCallback((term: Terminal | null) => {
@@ -64,88 +56,93 @@ export function useTerminal(onRefresh?: () => void) {
     termRef.current?.clear();
   }, []);
 
-  const executeCommand = (input: string) => {
-    const term = termRef.current;
-    if (!term) return;
+  const executeCommand = useCallback(
+    (input: string) => {
+      const term = termRef.current;
+      if (!term) return;
 
-    const trimmed = input.trim();
-    if (!trimmed) return;
+      const command = input.trim();
+      if (!command) return;
 
-    if (trimmed === "clear") {
-      term.clear();
-      return;
-    }
+      if (command === "clear") {
+        term.clear();
+        return;
+      }
 
-    term.writeln(`${ANSI.cyan}${ANSI.bold}>${ANSI.reset} ${trimmed}`);
-    term.writeln(`${ANSI.dim}Ejecutando...${ANSI.reset}`);
+      term.writeln(`${ANSI.cyan}${ANSI.bold}>${ANSI.reset} ${command}`);
+      term.writeln(`${ANSI.dim}Resolviendo comando local...${ANSI.reset}`);
+      setState((current) => ({ ...current, status: "running", provider: "local" }));
 
-    setState({ status: "running", provider: null });
-
-    fetch("/api/terminal/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command: trimmed }),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-
-        if (data.logs?.length) {
-          for (const log of data.logs) {
-            term.writeln(`${ANSI.dim}  ${log}${ANSI.reset}`);
-          }
-        }
-
-        if (data.ok && data.rawText) {
-          const ot = data.outputType ?? (data.isJson ? "json" : "text");
-          const typeTag =
-            ot === "action" ? `${ANSI.magenta}${ANSI.bold}[ACTION]${ANSI.reset} `
-            : ot === "json" ? `${ANSI.yellow}[JSON]${ANSI.reset} `
-            : `${ANSI.dim}[TEXT]${ANSI.reset} `;
-          const color =
-            ot === "action" ? ANSI.magenta
-            : ot === "json" ? ANSI.cyan
-            : ANSI.green;
-
-          if (ot === "json" && data.structuredOutput) {
-            const pretty = JSON.stringify(data.structuredOutput, null, 2);
-            for (const line of pretty.split("\n")) {
-              term.writeln(`${typeTag}${color}${line}${ANSI.reset}`);
-            }
-          } else {
-            for (const line of data.rawText.split("\n")) {
-              term.writeln(`${typeTag}${color}${line}${ANSI.reset}`);
-            }
-          }
-
-          const providerLabel = data.provider === "local" ? "local" : data.provider;
-          term.writeln(`${ANSI.dim}  ok ${providerLabel} | ${data.durationMs ?? 0}ms${ANSI.reset}`);
-
-          if (data.hint === "refresh_board") {
-            term.writeln(`${ANSI.yellow}  sync board...${ANSI.reset}`);
-            onRefresh?.();
-          }
-
-          setState({ status: "success", provider: data.provider });
-        } else {
-          const errMsg = data.error ?? "Sin respuesta del provider";
-          term.writeln(`${ANSI.red}  x ${errMsg}${ANSI.reset}`);
-          if (data.durationMs) {
-            term.writeln(`${ANSI.dim}  ${data.durationMs}ms${ANSI.reset}`);
-          }
-          setState({ status: "error", provider: data.provider ?? null });
-        }
-
-        term.writeln("");
+      fetch("/api/terminal/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command }),
       })
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : "Error de red";
-        term.writeln(`${ANSI.red}  x ${message}${ANSI.reset}`);
-        term.writeln("");
-        setState({ status: "error", provider: null });
-      });
-  };
+        .then(async (res) => {
+          const data = await res.json();
+
+          if (data.logs?.length) {
+            for (const log of data.logs) {
+              term.writeln(`${ANSI.dim}  ${log}${ANSI.reset}`);
+            }
+          }
+
+          const mode = data.meta?.mode === "agent" ? "agent" : "local";
+
+          if (data.ok && data.rawText) {
+            for (const line of String(data.rawText).split("\n")) {
+              const tag = mode === "agent" ? "[AGENT]" : "[LOCAL]";
+              const color = mode === "agent" ? ANSI.yellow : ANSI.green;
+              term.writeln(`${ANSI.magenta}${tag}${ANSI.reset} ${color}${line}${ANSI.reset}`);
+            }
+
+            term.writeln(`${ANSI.dim}  ok local | ${data.durationMs ?? 0}ms${ANSI.reset}`);
+
+            if (data.hint === "refresh_board") {
+              options.onRefresh?.();
+            }
+
+            if (data.meta?.affectedCardId) {
+              options.onOpenCard?.(
+                String(data.meta.affectedCardId),
+                typeof data.meta.projectId === "string" ? data.meta.projectId : undefined,
+              );
+            }
+
+            setState({
+              status: "success",
+              provider: "local",
+              mode,
+              connected: true,
+            });
+          } else {
+            const message = data.rawText ?? data.error ?? "Sin respuesta del terminal";
+            term.writeln(`${ANSI.red}  x ${message}${ANSI.reset}`);
+            setState({
+              status: "error",
+              provider: "local",
+              mode,
+              connected: true,
+            });
+          }
+
+          term.writeln("");
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "Error de red";
+          term.writeln(`${ANSI.red}  x ${message}${ANSI.reset}`);
+          term.writeln("");
+          setState({
+            status: "error",
+            provider: null,
+            mode: "local",
+            connected: false,
+          });
+        });
+    },
+    [options],
+  );
 
   const handle: TerminalHandle = { appendLog, clearTerminal, executeCommand };
-
   return { setTerminal, handle, state } as const;
 }

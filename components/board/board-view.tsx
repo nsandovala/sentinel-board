@@ -1,34 +1,28 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragStartEvent,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
-import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
-import { CardStatus } from "@/types/enums";
-import { SentinelCard } from "@/types/card";
-import { Column } from "./column";
+import { Brain, Clock, Cpu, Sparkles, Terminal } from "lucide-react";
 import { CardItemOverlay } from "./card-item";
-import {
-  Terminal,
-  Cpu,
-  Clock,
-  Sparkles,
-  Brain,
-} from "lucide-react";
-import type { DockEvent, EventType } from "@/types/event";
-import { cn } from "@/lib/utils";
+import { Column } from "./column";
+import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import {
   filterCardsByProjectId,
   filterEventsByProjectId,
 } from "@/lib/state/sentinel-reducer";
 import { scoreAndSortBacklog } from "@/lib/scoring/backlog-scorer";
+import { cn } from "@/lib/utils";
+import type { SentinelCard } from "@/types/card";
+import { CardStatus } from "@/types/enums";
+import type { DockEvent, EventType } from "@/types/event";
 
 const statusColumns: { key: CardStatus; label: string }[] = [
   { key: "idea_bruta", label: "Idea Bruta" },
@@ -38,7 +32,7 @@ const statusColumns: { key: CardStatus; label: string }[] = [
   { key: "desarrollo", label: "Desarrollo" },
   { key: "qa", label: "QA" },
   { key: "listo", label: "Listo" },
-  { key: "produccion", label: "Producción" },
+  { key: "produccion", label: "Produccion" },
   { key: "archivado", label: "Archivado" },
 ];
 
@@ -67,22 +61,26 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-function resolveCardFromTimelineMessage(message: string, cards: SentinelCard[]): SentinelCard | null {
+function resolveCardFromTimelineMessage(
+  message: string,
+  cards: SentinelCard[],
+): SentinelCard | null {
   const tryTitle = (raw: string): SentinelCard | null => {
-    const t = raw.trim();
-    if (!t || t.length > 200) return null;
-    const low = t.toLowerCase();
+    const title = raw.trim();
+    if (!title || title.length > 200) return null;
+    const lower = title.toLowerCase();
+
     return (
-      cards.find((c) => c.title === t) ??
-      cards.find((c) => c.title.toLowerCase() === low) ??
-      cards.find((c) => c.title.toLowerCase().includes(low)) ??
-      cards.find((c) => low.includes(c.title.toLowerCase()) && c.title.length > 2) ??
+      cards.find((card) => card.title === title) ??
+      cards.find((card) => card.title.toLowerCase() === lower) ??
+      cards.find((card) => card.title.toLowerCase().includes(lower)) ??
+      cards.find((card) => lower.includes(card.title.toLowerCase()) && card.title.length > 2) ??
       null
     );
   };
 
-  for (const m of message.matchAll(/"([^"]{1,200})"/g)) {
-    const hit = tryTitle(m[1] ?? "");
+  for (const match of message.matchAll(/"([^"]{1,200})"/g)) {
+    const hit = tryTitle(match[1] ?? "");
     if (hit) return hit;
   }
 
@@ -92,7 +90,7 @@ function resolveCardFromTimelineMessage(message: string, cards: SentinelCard[]):
     if (hit) return hit;
   }
 
-  const arrow = message.match(/^"([^"]+)"\s*(?:→|->)/);
+  const arrow = message.match(/^"([^"]+)"\s*(?:->|→)/);
   if (arrow?.[1]) {
     const hit = tryTitle(arrow[1]);
     if (hit) return hit;
@@ -105,9 +103,10 @@ function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelC
   const dispatch = useSentinelDispatch();
   const sorted = [...events].reverse();
 
-  const openCard = (cardId: string) => {
-    dispatch({ type: "SELECT_CARD", cardId });
+  const openCard = (card: SentinelCard) => {
+    dispatch({ type: "SELECT_PROJECT", projectId: card.projectId });
     dispatch({ type: "SET_VIEW", view: "board" });
+    dispatch({ type: "SELECT_CARD", cardId: card.id });
   };
 
   return (
@@ -117,35 +116,38 @@ function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelC
         Clic en una fila con tarjeta citada abre el detalle en el board.
       </p>
       <div className="flex flex-col gap-1">
-        {sorted.map((ev) => {
-          const Icon = eventIcons[ev.type];
-          const linked = resolveCardFromTimelineMessage(ev.message, cards);
+        {sorted.map((event) => {
+          const Icon = eventIcons[event.type];
+          const linkedCard = resolveCardFromTimelineMessage(event.message, cards);
+
           return (
             <div
-              key={ev.id}
-              role={linked ? "button" : undefined}
-              tabIndex={linked ? 0 : undefined}
-              onClick={linked ? () => openCard(linked.id) : undefined}
+              key={event.id}
+              role={linkedCard ? "button" : undefined}
+              tabIndex={linkedCard ? 0 : undefined}
+              onClick={linkedCard ? () => openCard(linkedCard) : undefined}
               onKeyDown={
-                linked
+                linkedCard
                   ? (e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        openCard(linked.id);
+                        openCard(linkedCard);
                       }
                     }
                   : undefined
               }
               className={cn(
                 "flex items-start gap-3 rounded-md px-3 py-2 transition-colors hover:bg-muted/25",
-                linked && "cursor-pointer hover:bg-muted/38",
+                linkedCard && "cursor-pointer hover:bg-muted/38",
               )}
-              title={linked ? `Abrir «${linked.title}»` : undefined}
+              title={linkedCard ? `Abrir "${linkedCard.title}"` : undefined}
             >
-              <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${eventColors[ev.type]}`} />
-              <span className="flex-1 whitespace-pre-wrap text-[13px] text-foreground/80">{ev.message}</span>
+              <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${eventColors[event.type]}`} />
+              <span className="flex-1 whitespace-pre-wrap text-[13px] text-foreground/80">
+                {event.message}
+              </span>
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                {formatTime(ev.timestamp)}
+                {formatTime(event.timestamp)}
               </span>
             </div>
           );
@@ -178,6 +180,7 @@ function BacklogView({
   activeProject: { id: string; name: string } | null;
   allProjects: { id: string; name: string }[];
 }) {
+  const { selectedCardId } = useSentinel();
   const dispatch = useSentinelDispatch();
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<BacklogAnalysisResult | null>(null);
@@ -233,23 +236,37 @@ function BacklogView({
       if (parsed?.suggestions) {
         setAnalysisResult(parsed);
       } else {
-        setAnalysisError("Respuesta inválida del agente");
+        setAnalysisError("Respuesta invalida del agente");
       }
     } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : "Error de conexión");
+      setAnalysisError(err instanceof Error ? err.message : "Error de conexion");
     } finally {
       setAnalyzing(false);
     }
   };
 
   const handlePromote = (cardId: string) => {
-    dispatch({ type: "MOVE_CARD", cardId, status: "en_proceso" });
-    setAnalysisResult((prev: BacklogAnalysisResult | null) =>
+    dispatch({ type: "MOVE_CARD", cardId, status: "clarificando" });
+    setAnalysisResult((prev) =>
       prev
-        ? { ...prev, suggestions: prev.suggestions.filter((s: { cardId: string }) => s.cardId !== cardId) }
+        ? {
+            ...prev,
+            suggestions: prev.suggestions.filter((suggestion) => suggestion.cardId !== cardId),
+          }
         : null,
     );
   };
+
+  const openInBoard = (card: SentinelCard) => {
+    dispatch({ type: "SELECT_PROJECT", projectId: card.projectId });
+    dispatch({ type: "SET_VIEW", view: "board" });
+    dispatch({ type: "SELECT_CARD", cardId: card.id });
+  };
+
+  const blockedSuggestedAction = (card: SentinelCard) =>
+    card.status === "idea_bruta"
+      ? 'Promover a "clarificando" para bajar alcance y destrabar definiciones.'
+      : 'Diagnosticar el bloqueo y mover a "clarificando" si falta definicion operativa.';
 
   return (
     <div className="sentinel-board-canvas flex h-full flex-col overflow-y-auto p-6">
@@ -257,7 +274,8 @@ function BacklogView({
         <div>
           <h2 className="text-sm font-semibold text-foreground">Backlog</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Ideas brutas y tareas bloqueadas · ordenadas por prioridad · clic para abrir en board
+            Ideas brutas y tareas bloqueadas · ordenadas por prioridad · clic en fila para ver
+            detalle
           </p>
         </div>
         <button
@@ -281,17 +299,24 @@ function BacklogView({
       {analysisResult && analysisResult.suggestions.length > 0 && (
         <div className="mb-4 rounded-lg border border-violet-400/20 bg-violet-500/5 p-4">
           <h3 className="mb-2 text-xs font-semibold text-violet-400">
-            Sugerencias de promoción
+            Sugerencias de promocion
           </h3>
-          {analysisResult.suggestions.map((s) => (
-            <div key={s.cardId} className="mb-2 flex items-center justify-between rounded-md border border-border/30 bg-card px-3 py-2">
+          {analysisResult.suggestions.map((suggestion) => (
+            <div
+              key={suggestion.cardId}
+              className="mb-2 flex items-center justify-between rounded-md border border-border/30 bg-card px-3 py-2"
+            >
               <div className="flex-1">
-                <span className="text-[13px] font-medium text-card-foreground">{s.title}</span>
-                <p className="mt-0.5 text-xs text-muted-foreground">{s.justification}</p>
+                <span className="text-[13px] font-medium text-card-foreground">
+                  {suggestion.title}
+                </span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {suggestion.justification}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => handlePromote(s.cardId)}
+                onClick={() => handlePromote(suggestion.cardId)}
                 className="ml-3 shrink-0 rounded-md bg-violet-500 px-2 py-1 text-xs font-medium text-white hover:bg-violet-600"
               >
                 Promover
@@ -299,7 +324,7 @@ function BacklogView({
             </div>
           ))}
           {analysisResult.reasoning && (
-            <p className="mt-3 border-t border-violet-400/10 pt-2 text-xs text-muted-foreground italic">
+            <p className="mt-3 border-t border-violet-400/10 pt-2 text-xs italic text-muted-foreground">
               {analysisResult.reasoning}
             </p>
           )}
@@ -308,42 +333,99 @@ function BacklogView({
 
       <div className="flex flex-col gap-2">
         {scored.map(({ card, score }) => (
-          <button
+          <div
             key={card.id}
-            type="button"
-            onClick={() => {
-              dispatch({ type: "SELECT_CARD", cardId: card.id });
-              dispatch({ type: "SET_VIEW", view: "board" });
+            role="button"
+            tabIndex={0}
+            onClick={() => dispatch({ type: "SELECT_CARD", cardId: card.id })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                dispatch({ type: "SELECT_CARD", cardId: card.id });
+              }
             }}
-            className="sentinel-backlog-row flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors"
+            className={cn(
+              "sentinel-backlog-row group flex w-full flex-col gap-2 rounded-lg p-3 text-left transition-colors hover:border-border/40 hover:bg-muted/20",
+              selectedCardId === card.id && "sentinel-backlog-row-selected",
+            )}
           >
-            {card.blocked && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-red-400/85" title="Bloqueada" />
-            )}
-            {!card.blocked && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-foreground/28" />
-            )}
-            <div className="flex-1">
-              <span className="text-[13px] font-medium text-card-foreground">{card.title}</span>
-              {card.description && (
-                <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{card.description}</p>
-              )}
+            <div className="flex w-full items-center gap-3">
+              <span
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  card.blocked ? "bg-red-400/85" : "bg-foreground/28",
+                )}
+                title={card.blocked ? "Bloqueada" : "Disponible"}
+              />
+              <div className="min-w-0 flex-1">
+                <span className="text-[13px] font-medium text-card-foreground">{card.title}</span>
+                {card.description && (
+                  <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                    {card.description}
+                  </p>
+                )}
+              </div>
+              <span className="text-[10px] uppercase text-muted-foreground">{card.status}</span>
+              <span
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ring-1",
+                  scoreColor(score.score),
+                )}
+                title={`Score: ${score.score} (edad: ${score.ageScore}, proyecto: ${score.projectScore}, urgencia: ${score.urgencyScore})`}
+              >
+                {score.score}
+              </span>
             </div>
-            <span className="text-[10px] uppercase text-muted-foreground">{card.status}</span>
-            {/* Score badge */}
-            <span
-              className={cn(
-                "rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ring-1",
-                scoreColor(score.score),
-              )}
-              title={`Score: ${score.score} (edad: ${score.ageScore}, proyecto: ${score.projectScore}, urgencia: ${score.urgencyScore})`}
-            >
-              {score.score}
-            </span>
-          </button>
+
+            {card.blocked && (
+              <div className="flex items-center gap-2 rounded-md border border-red-400/20 bg-red-500/5 px-2.5 py-1.5">
+                <span className="min-w-0 flex-1 text-[11px] text-red-300">
+                  Bloqueada
+                  {card.blockerReason ? ` · ${card.blockerReason}` : " · sin motivo registrado"}
+                  <span className="ml-2 text-[10px] text-red-200/75">
+                    Accion sugerida: {blockedSuggestedAction(card)}
+                  </span>
+                </span>
+                <span className="text-[10px] text-muted-foreground">·</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePromote(card.id);
+                  }}
+                  className="text-[11px] font-medium text-violet-300 hover:text-violet-200"
+                >
+                  Promover a clarificando
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pl-5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePromote(card.id);
+                }}
+                className="rounded-md border border-border/30 bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-foreground/80 transition-colors hover:bg-primary/15 hover:text-foreground"
+              >
+                Promover
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openInBoard(card);
+                }}
+                className="rounded-md border border-border/30 bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-foreground/80 transition-colors hover:bg-primary/15 hover:text-foreground"
+              >
+                Abrir en board
+              </button>
+            </div>
+          </div>
         ))}
         {scored.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">Backlog vacío</p>
+          <p className="py-12 text-center text-sm text-muted-foreground">Backlog vacio</p>
         )}
       </div>
     </div>
@@ -359,13 +441,10 @@ export function BoardView() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      const card = (event.active.data.current as { card?: SentinelCard })?.card ?? null;
-      setActiveCard(card);
-    },
-    [],
-  );
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const card = (event.active.data.current as { card?: SentinelCard })?.card ?? null;
+    setActiveCard(card);
+  }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -377,7 +456,6 @@ export function BoardView() {
       const targetStatus = (over.data.current as { status?: CardStatus })?.status;
 
       if (!card || !targetStatus || card.status === targetStatus) return;
-
       dispatch({ type: "MOVE_CARD", cardId: card.id, status: targetStatus });
     },
     [dispatch],
@@ -386,14 +464,19 @@ export function BoardView() {
   const visibleCards = filterCardsByProjectId(cards, selectedProjectId);
   const visibleEvents = filterEventsByProjectId(events, selectedProjectId, projects, cards);
 
-  if (activeView === "timeline")
+  if (activeView === "timeline") {
     return <TimelineView events={visibleEvents} cards={visibleCards} />;
+  }
 
   if (activeView === "backlog") {
     const activeProject = selectedProjectId
-      ? projects.find((p) => p.id === selectedProjectId) ?? null
+      ? projects.find((project) => project.id === selectedProjectId) ?? null
       : null;
-    const projectsForAnalyzer = projects.map((p) => ({ id: p.id, name: p.name }));
+    const projectsForAnalyzer = projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+    }));
+
     return (
       <BacklogView
         cards={visibleCards}
@@ -404,12 +487,9 @@ export function BoardView() {
   }
 
   const grouped = groupByStatus(visibleCards);
+
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="sentinel-board-canvas sentinel-board-pizarra relative isolate flex h-full gap-3 overflow-x-auto p-3">
         {statusColumns.map(({ key, label }) => (
           <div key={key} className="sentinel-board-lane shrink-0">

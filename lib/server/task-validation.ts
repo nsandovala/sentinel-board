@@ -54,9 +54,9 @@ export interface NormalizedTaskCreate {
   projectId: string;
   blocked: boolean;
   blockerReason: string | null;
-  codexLoop: Record<string, string | undefined> | null;
-  fiveWhys: Record<string, string | undefined> | null;
-  moneyCode: Record<string, number | undefined> | null;
+  codexLoop: Record<string, unknown> | null;
+  fiveWhys: Record<string, unknown> | null;
+  moneyCode: Record<string, unknown> | null;
   checklist: SentinelCard["checklist"];
 }
 
@@ -169,32 +169,18 @@ function normalizeChecklist(
   return { ok: true, value: normalized };
 }
 
-function normalizeStringMap(value: unknown): Record<string, string | undefined> | null {
+function normalizeJsonObject(value: unknown): Record<string, unknown> | null {
   const record = asRecord(value);
   if (!record) return null;
 
-  const normalized: Record<string, string | undefined> = {};
+  const normalized: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(record)) {
-    if (raw === undefined || raw === null) {
-      normalized[key] = undefined;
-    } else if (typeof raw === "string") {
+    if (raw === undefined) continue;
+    if (typeof raw === "string") {
       normalized[key] = raw.trim() || undefined;
+      continue;
     }
-  }
-  return normalized;
-}
-
-function normalizeNumberMap(value: unknown): Record<string, number | undefined> | null {
-  const record = asRecord(value);
-  if (!record) return null;
-
-  const normalized: Record<string, number | undefined> = {};
-  for (const [key, raw] of Object.entries(record)) {
-    if (raw === undefined || raw === null) {
-      normalized[key] = undefined;
-    } else if (typeof raw === "number" && Number.isFinite(raw)) {
-      normalized[key] = raw;
-    }
+    normalized[key] = raw;
   }
   return normalized;
 }
@@ -244,9 +230,9 @@ export function validateTaskCreate(
       projectId: projectId.value,
       blocked: Boolean(body.blocked),
       blockerReason: normalizeOptionalString(body.blockerReason),
-      codexLoop: normalizeStringMap(body.codexLoop),
-      fiveWhys: normalizeStringMap(body.fiveWhys),
-      moneyCode: normalizeNumberMap(body.moneyCode),
+      codexLoop: normalizeJsonObject(body.codexLoop),
+      fiveWhys: normalizeJsonObject(body.fiveWhys),
+      moneyCode: normalizeJsonObject(body.moneyCode),
       checklist: checklist.value,
     },
   };
