@@ -1,33 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { tasks } from "@/lib/db/schema";
+import { tasks, events } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { logDockEvent } from "@/lib/server/log-event";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
-import { validateTaskPatch } from "@/lib/server/task-validation";
+import { syncBus } from "@/lib/server/sync-bus";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: RouteContext,
 ) {
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
-
     const { id } = await params;
 
-    const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
 
-    await db.delete(tasks).where(eq(tasks.id, id));
+    db.delete(tasks).where(eq(tasks.id, id)).run();
 
-    await logDockEvent("command", `Tarea eliminada: "${existing.title}"`);
+    db.insert(events)
+      .values({
+        id: `ev-${Date.now()}`,
+        type: "command",
+        message: `Tarea eliminada: "${existing.title}"`,
+      })
+      .run();
+
+    syncBus.emitTaskDeleted(id, { projectId: existing.projectId });
 
     return NextResponse.json({ ok: true, deleted: { id, title: existing.title } });
   } catch (err) {
@@ -38,40 +41,53 @@ export async function DELETE(
   }
 }
 
+interface PatchBody {
+  status?: string;
+  title?: string;
+  description?: string | null;
+  priority?: string;
+  type?: string;
+  tags?: string[];
+  blocked?: boolean;
+  blockerReason?: string | null;
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
-
     const { id } = await params;
-    const body = (await req.json()) as Record<string, unknown>;
+    const body = (await req.json()) as PatchBody;
 
-    const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
 
-    const normalized = validateTaskPatch(body);
-    if (!normalized.ok) {
-      return NextResponse.json(
-        { ok: false, error: normalized.error },
-        { status: 400 },
-      );
+    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.title !== undefined) updates.title = body.title;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.priority !== undefined) updates.priority = body.priority;
+    if (body.type !== undefined) updates.type = body.type;
+    if (body.tags !== undefined) updates.tags = body.tags;
+    if (body.blocked !== undefined) updates.blocked = body.blocked;
+    if (body.blockerReason !== undefined) updates.blockerReason = body.blockerReason;
+
+    db.update(tasks).set(updates).where(eq(tasks.id, id)).run();
+
+    if (body.status && body.status !== existing.status) {
+      db.insert(events)
+        .values({
+          id: `ev-${Date.now()}`,
+          type: "command",
+          message: `"${existing.title}" → ${body.status}`,
+        })
+        .run();
     }
 
-    const updates: Partial<typeof tasks.$inferInsert> = {
-      ...normalized.value,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await db.update(tasks).set(updates).where(eq(tasks.id, id));
-
-    if (normalized.value.status && normalized.value.status !== existing.status) {
-      await logDockEvent("command", `"${existing.title}" -> ${normalized.value.status}`);
-    }
+    syncBus.emitTaskUpdated(id, { projectId: existing.projectId, changes: Object.keys(body) });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -1,8 +1,8 @@
-import { pgTable, text, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 // ── Projects ────────────────────────────────────────────────────────────────
 
-export const projects = pgTable("projects", {
+export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
@@ -12,40 +12,40 @@ export const projects = pgTable("projects", {
   status: text("status", { enum: ["active", "paused", "archived"] })
     .notNull()
     .default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+  createdAt: text("created_at")
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 // ── Tasks (cards) ───────────────────────────────────────────────────────────
 
-export const tasks = pgTable("tasks", {
+export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("idea_bruta"),
   type: text("type").notNull().default("task"),
   priority: text("priority").notNull().default("medium"),
-  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
   projectId: text("project_id")
     .notNull()
     .references(() => projects.id),
-  blocked: boolean("blocked").notNull().default(false),
+  blocked: integer("blocked", { mode: "boolean" }).notNull().default(false),
   blockerReason: text("blocker_reason"),
-  codexLoop: jsonb("codex_loop").$type<Record<string, string | undefined>>(),
-  fiveWhys: jsonb("five_whys").$type<Record<string, string | undefined>>(),
-  moneyCode: jsonb("money_code").$type<Record<string, number | undefined>>(),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+  codexLoop: text("codex_loop", { mode: "json" }).$type<Record<string, string | undefined>>(),
+  fiveWhys: text("five_whys", { mode: "json" }).$type<Record<string, string | undefined>>(),
+  moneyCode: text("money_code", { mode: "json" }).$type<Record<string, number | undefined>>(),
+  createdAt: text("created_at")
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 // ── Task checklist items ────────────────────────────────────────────────────
 
-export const taskChecklistItems = pgTable("task_checklist_items", {
+export const taskChecklistItems = sqliteTable("task_checklist_items", {
   id: text("id").primaryKey(),
   taskId: text("task_id")
     .notNull()
@@ -61,7 +61,7 @@ export const taskChecklistItems = pgTable("task_checklist_items", {
 
 // ── Card comments ──────────────────────────────────────────────────────────
 
-export const cardComments = pgTable("card_comments", {
+export const cardComments = sqliteTable("card_comments", {
   id: text("id").primaryKey(),
   cardId: text("card_id")
     .notNull()
@@ -73,43 +73,43 @@ export const cardComments = pgTable("card_comments", {
   })
     .notNull()
     .default("comment"),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+  createdAt: text("created_at")
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 // ── Events (timeline) ───────────────────────────────────────────────────────
 
-export const events = pgTable("events", {
+export const events = sqliteTable("events", {
   id: text("id").primaryKey(),
   type: text("type", {
     enum: ["command", "system", "heo_suggestion", "focus"],
   }).notNull(),
   message: text("message").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+  createdAt: text("created_at")
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 // ── Dock commands ───────────────────────────────────────────────────────────
 
-export const dockCommands = pgTable("dock_commands", {
+export const dockCommands = sqliteTable("dock_commands", {
   id: text("id").primaryKey(),
   action: text("action").notNull(),
   target: text("target"),
   project: text("project"),
   value: text("value"),
   raw: text("raw").notNull(),
-  success: boolean("success").notNull().default(false),
+  success: integer("success", { mode: "boolean" }).notNull().default(false),
   resultMessage: text("result_message"),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+  createdAt: text("created_at")
     .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 // ── Focus sessions ──────────────────────────────────────────────────────────
 
-export const focusSessions = pgTable("focus_sessions", {
+export const focusSessions = sqliteTable("focus_sessions", {
   id: text("id").primaryKey(),
   project: text("project"),
   state: text("state", {
@@ -117,36 +117,48 @@ export const focusSessions = pgTable("focus_sessions", {
   })
     .notNull()
     .default("idle"),
-  startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
-  endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
+  startedAt: text("started_at"),
+  endedAt: text("ended_at"),
   elapsedSeconds: integer("elapsed_seconds").notNull().default(0),
 });
 
-// ── Knowledge entries ───────────────────────────────────────────────────────
+// ── Suggestion feedback ─────────────────────────────────────────────────────
 
-export const knowledgeEntries = pgTable("knowledge_entries", {
+export const suggestionFeedback = sqliteTable("suggestion_feedback", {
   id: text("id").primaryKey(),
-  projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+  projectId: text("project_id").notNull(),
+  taskId: text("task_id"),
+  source: text("source").notNull(),
+  suggestionType: text("suggestion_type").notNull(),
+  content: text("content").notNull(),
+  decision: text("decision", {
+    enum: ["accepted", "rejected", "ignored"],
+  }).notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+// ── System insights ─────────────────────────────────────────────────────────
+
+export const systemInsights = sqliteTable("system_insights", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  taskId: text("task_id"),
+  type: text("type").notNull(),
+  severity: text("severity", {
+    enum: ["low", "medium", "high", "critical"],
+  }).notNull(),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
-  category: text("category", {
-    enum: ["report", "decision", "runbook", "note", "postmortem"],
-  })
-    .notNull()
-    .default("note"),
+  summary: text("summary").notNull(),
+  evidenceJson: text("evidence_json", { mode: "json" }),
   status: text("status", {
-    enum: ["draft", "published", "archived"],
-  })
+    enum: ["open", "dismissed", "resolved"],
+  }).notNull().default("open"),
+  createdAt: text("created_at")
     .notNull()
-    .default("published"),
-  tags: jsonb("tags").$type<string[]>().notNull().default([]),
-  summary: text("summary"),
-  body: text("body").notNull(),
-  sourceTaskId: text("source_task_id").references(() => tasks.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
-    .notNull()
-    .defaultNow(),
+    .$defaultFn(() => new Date().toISOString()),
 });

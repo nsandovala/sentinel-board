@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { focusSessions } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { logDockEvent } from "@/lib/server/log-event";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
+import { syncBus } from "@/lib/server/sync-bus";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +16,6 @@ interface FocusSessionBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
-
     const body = (await req.json()) as FocusSessionBody;
 
     if (!body.action) {
@@ -33,31 +29,25 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "start") {
       const id = `fs-${Date.now()}`;
-      await db.insert(focusSessions)
+      db.insert(focusSessions)
         .values({
           id,
           project: body.project ?? null,
           state: "running",
           startedAt: now,
           elapsedSeconds: 0,
-        });
-
-      const label = body.project
-        ? `Foco iniciado en ${body.project}`
-        : "Foco iniciado";
-      await logDockEvent("focus", label);
-
+        })
+        .run();
+      syncBus.emitFocusStarted(id, { project: body.project });
       return NextResponse.json({ ok: true, id, state: "running" });
     }
 
-    const requiredState = body.action === "resume" ? "paused" : "running";
-
-    const [current] = await db
+    const current = db
       .select()
       .from(focusSessions)
-      .where(eq(focusSessions.state, requiredState))
+      .where(eq(focusSessions.state, "running"))
       .orderBy(desc(focusSessions.startedAt))
-      .limit(1);
+      .get();
 
     if (!current) {
       return NextResponse.json(
@@ -67,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     let newState: SessionState = current.state as SessionState;
-    const updates: Partial<typeof focusSessions.$inferInsert> = {};
+    const updates: Record<string, unknown> = {};
 
     if (body.action === "end") {
       newState = "ended";
@@ -87,23 +77,13 @@ export async function POST(req: NextRequest) {
       updates.state = "running";
     }
 
-    await db.update(focusSessions)
+    db.update(focusSessions)
       .set(updates)
-      .where(eq(focusSessions.id, current.id));
+      .where(eq(focusSessions.id, current.id))
+      .run();
 
-    const proj = current.project;
     if (body.action === "end") {
-      const mins = body.elapsedSeconds != null
-        ? Math.floor(body.elapsedSeconds / 60)
-        : 0;
-      const msg = proj
-        ? `Foco terminado — ${mins} min en ${proj}`
-        : `Foco terminado — ${mins} min`;
-      await logDockEvent("focus", msg);
-    } else if (body.action === "pause") {
-      await logDockEvent("focus", proj ? `Foco pausado en ${proj}` : "Foco pausado");
-    } else if (body.action === "resume") {
-      await logDockEvent("focus", proj ? `Foco reanudado en ${proj}` : "Foco reanudado");
+      syncBus.emitFocusEnded(current.id, { project: current.project, elapsedSeconds: body.elapsedSeconds });
     }
 
     return NextResponse.json({ ok: true, id: current.id, state: newState });
@@ -117,11 +97,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const rows = await db
+    const rows = db
       .select()
       .from(focusSessions)
       .orderBy(desc(focusSessions.startedAt))
-      .limit(20);
+      .limit(20)
+      .all();
     return NextResponse.json({ ok: true, sessions: rows });
   } catch (err) {
     return NextResponse.json(
