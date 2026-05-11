@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
             tags: (card.tags ?? []) as string[],
             checklistTotal: checklist.length,
             checklistDone: checklist.filter((c) => c.status === "done").length,
-            createdAt: card.createdAt,
+            createdAt: card.createdAt instanceof Date ? card.createdAt.toISOString() : card.createdAt,
             description: card.description ?? undefined,
           },
         };

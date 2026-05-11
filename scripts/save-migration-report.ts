@@ -16,7 +16,7 @@ async function loadDb() {
 const REPORT_TASK_ID = "sb-report-neon-render-2026-04-29";
 const REPORT_COMMENT_ID = "sb-report-neon-render-2026-04-29-comment";
 const PROJECT_ID = "5";
-const now = new Date().toISOString();
+const now = new Date();
 
 const reportBody = `INFORME COMPLETO — MIGRACION BACKEND-FIRST A POSTGRES/NEON PARA RENDER
 
@@ -151,8 +151,7 @@ async function upsertTask() {
       tags: ["backend", "documentacion", "neon", "postgres", "render", "migracion"],
       projectId: PROJECT_ID,
       blocked: false,
-      createdAt: now,
-      updatedAt: now,
+
     })
     .onConflictDoUpdate({
       target: tasks.id,

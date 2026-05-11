@@ -17,7 +17,7 @@ const REPORT_TASK_ID = "sb-audit-backend-first-2026-04-30";
 const REPORT_COMMENT_ID = "sb-audit-backend-first-2026-04-30-comment";
 const KNOWLEDGE_ID = "kb-audit-backend-first-2026-04-30";
 const PROJECT_ID = "5";
-const now = new Date().toISOString();
+const now = new Date();
 
 const auditBody = `AUDITORIA TECNICA — SENTINEL BOARD BACKEND-FIRST POST-MIGRACION NEON/POSTGRES
 
@@ -263,8 +263,7 @@ async function upsertTask() {
       tags: ["auditoria", "backend", "documentacion", "neon", "postgres", "arquitectura", "firebase"],
       projectId: PROJECT_ID,
       blocked: false,
-      createdAt: now,
-      updatedAt: now,
+
     })
     .onConflictDoUpdate({
       target: tasks.id,

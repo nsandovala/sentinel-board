@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const insights = listInsights({ projectId, status });
+    const insights = await listInsights({ projectId, status });
 
     return NextResponse.json({ ok: true, insights });
   } catch (err) {
@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const insight = updateInsightStatus(body.id, body.status);
+    const insight = await updateInsightStatus(body.id, body.status);
 
     if (!insight) {
       return NextResponse.json(

@@ -32,14 +32,14 @@ function assembleCard(
     moneyCode: (row.moneyCode as unknown as SentinelCard["moneyCode"]) ?? undefined,
     blocked: row.blocked,
     blockerReason: row.blockerReason ?? undefined,
-    createdAt: row.createdAt,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
   };
 }
 
 export async function GET() {
   try {
-    const allTasks = db.select().from(tasks).all();
-    const allChecklist = db.select().from(taskChecklistItems).all();
+    const allTasks = await db.select().from(tasks);
+    const allChecklist = await db.select().from(taskChecklistItems);
 
     const checklistByTask = new Map<string, (typeof taskChecklistItems.$inferSelect)[]>();
     for (const ci of allChecklist) {
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    db.insert(tasks)
+    await db.insert(tasks)
       .values({
         id: body.id,
         title: body.title,
@@ -86,40 +86,36 @@ export async function POST(req: NextRequest) {
         codexLoop: (body.codexLoop as Record<string, string | undefined>) ?? null,
         fiveWhys: (body.fiveWhys as Record<string, string | undefined>) ?? null,
         moneyCode: (body.moneyCode as unknown as Record<string, number | undefined>) ?? null,
-      })
-      .run();
+      });
 
     if (body.checklist?.length) {
       for (let i = 0; i < body.checklist.length; i++) {
         const item = body.checklist[i];
-        db.insert(taskChecklistItems)
+        await db.insert(taskChecklistItems)
           .values({
             id: item.id,
             taskId: body.id,
             text: item.text,
             status: item.status,
             sortOrder: i,
-          })
-          .run();
+          });
       }
     }
 
-    db.insert(events)
+    await db.insert(events)
       .values({
         id: `ev-${Date.now()}`,
         type: "command",
         message: `Tarea creada: "${body.title}"`,
-      })
-      .run();
+      });
 
     syncBus.emitTaskCreated(body.id, { projectId: body.projectId });
 
-    const inserted = db.select().from(tasks).where(eq(tasks.id, body.id)).get();
-    const checklist = db
+    const [inserted] = await db.select().from(tasks).where(eq(tasks.id, body.id)).limit(1);
+    const checklist = await db
       .select()
       .from(taskChecklistItems)
-      .where(eq(taskChecklistItems.taskId, body.id))
-      .all();
+      .where(eq(taskChecklistItems.taskId, body.id));
 
     return NextResponse.json({
       ok: true,

@@ -26,7 +26,7 @@ export async function GET(
       author: r.author,
       body: r.body,
       type: r.type as CardComment["type"],
-      createdAt: r.createdAt,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     }));
 
     return NextResponse.json({ ok: true, comments });

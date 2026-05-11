@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const feedback = createFeedback({
+    const feedback = await createFeedback({
       projectId: body.projectId,
       taskId: body.taskId,
       source: body.source,
@@ -80,11 +80,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const feedback = listFeedback({ projectId, taskId, decision });
+    const feedback = await listFeedback({ projectId, taskId, decision });
 
     const result: Record<string, unknown> = { ok: true, feedback };
     if (metrics) {
-      result.metrics = getFeedbackMetrics(projectId);
+      result.metrics = await getFeedbackMetrics(projectId);
     }
 
     return NextResponse.json(result);

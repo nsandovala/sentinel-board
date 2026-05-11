@@ -15,20 +15,19 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
 
-    db.delete(tasks).where(eq(tasks.id, id)).run();
+    await db.delete(tasks).where(eq(tasks.id, id));
 
-    db.insert(events)
+    await db.insert(events)
       .values({
         id: `ev-${Date.now()}`,
         type: "command",
         message: `Tarea eliminada: "${existing.title}"`,
-      })
-      .run();
+      });
 
     syncBus.emitTaskDeleted(id, { projectId: existing.projectId });
 
@@ -60,12 +59,12 @@ export async function PATCH(
     const { id } = await params;
     const body = (await req.json()) as PatchBody;
 
-    const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
     }
 
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (body.status !== undefined) updates.status = body.status;
     if (body.title !== undefined) updates.title = body.title;
     if (body.description !== undefined) updates.description = body.description;
@@ -75,16 +74,15 @@ export async function PATCH(
     if (body.blocked !== undefined) updates.blocked = body.blocked;
     if (body.blockerReason !== undefined) updates.blockerReason = body.blockerReason;
 
-    db.update(tasks).set(updates).where(eq(tasks.id, id)).run();
+    await db.update(tasks).set(updates).where(eq(tasks.id, id));
 
     if (body.status && body.status !== existing.status) {
-      db.insert(events)
+      await db.insert(events)
         .values({
           id: `ev-${Date.now()}`,
           type: "command",
           message: `"${existing.title}" → ${body.status}`,
-        })
-        .run();
+        });
     }
 
     syncBus.emitTaskUpdated(id, { projectId: existing.projectId, changes: Object.keys(body) });

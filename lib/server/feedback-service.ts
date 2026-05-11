@@ -30,10 +30,15 @@ function sanitizeText(text: string): string {
     .trim();
 }
 
-export function createFeedback(input: CreateFeedbackInput): FeedbackEntry {
+function toIsoString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+export async function createFeedback(input: CreateFeedbackInput): Promise<FeedbackEntry> {
   const id = `fb-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-  const row = db.insert(suggestionFeedback)
+  const [row] = await db.insert(suggestionFeedback)
     .values({
       id,
       projectId: input.projectId,
@@ -43,8 +48,7 @@ export function createFeedback(input: CreateFeedbackInput): FeedbackEntry {
       content: sanitizeText(input.content),
       decision: input.decision,
     })
-    .returning()
-    .get();
+    .returning();
 
   syncBus.emitFeedbackCreated(id, { projectId: input.projectId });
 
@@ -56,15 +60,15 @@ export function createFeedback(input: CreateFeedbackInput): FeedbackEntry {
     suggestionType: row.suggestionType,
     content: row.content,
     decision: row.decision as FeedbackEntry["decision"],
-    createdAt: row.createdAt,
+    createdAt: toIsoString(row.createdAt),
   };
 }
 
-export function listFeedback(options?: {
+export async function listFeedback(options?: {
   projectId?: string;
   taskId?: string;
   decision?: "accepted" | "rejected" | "ignored";
-}): FeedbackEntry[] {
+}): Promise<FeedbackEntry[]> {
   const conditions = [];
 
   if (options?.projectId) {
@@ -77,12 +81,11 @@ export function listFeedback(options?: {
     conditions.push(eq(suggestionFeedback.decision, options.decision));
   }
 
-  const rows = db
+  const rows = await db
     .select()
     .from(suggestionFeedback)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(suggestionFeedback.createdAt))
-    .all();
+    .orderBy(desc(suggestionFeedback.createdAt));
 
   return rows.map((row) => ({
     id: row.id,
@@ -92,18 +95,18 @@ export function listFeedback(options?: {
     suggestionType: row.suggestionType,
     content: row.content,
     decision: row.decision as FeedbackEntry["decision"],
-    createdAt: row.createdAt,
+    createdAt: toIsoString(row.createdAt),
   }));
 }
 
-export function getFeedbackMetrics(projectId: string): {
+export async function getFeedbackMetrics(projectId: string): Promise<{
   total: number;
   accepted: number;
   rejected: number;
   ignored: number;
   acceptanceRate: number;
-} {
-  const all = listFeedback({ projectId });
+}> {
+  const all = await listFeedback({ projectId });
   const accepted = all.filter((f) => f.decision === "accepted").length;
   const rejected = all.filter((f) => f.decision === "rejected").length;
   const ignored = all.filter((f) => f.decision === "ignored").length;

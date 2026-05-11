@@ -2,12 +2,12 @@
  * action-executor.ts
  *
  * Purpose: Execute resolved terminal actions against the real DB.
- * Uses the SAME SQLite database the board reads from — no separate store.
+ * Uses the SAME Postgres database the board reads from — no separate store.
  *
  * Input:  ResolvedAction from action-resolver.ts
  * Output: ActionResult with structured data for the terminal
  *
- * Dependency: lib/db (Drizzle + better-sqlite3), lib/db/schema
+ * Dependency: lib/db (Drizzle + node-postgres), lib/db/schema
  *
  * Risks:
  * - Writes here bypass the React reducer. The client needs to re-hydrate
@@ -39,8 +39,8 @@ const PRIORITY_ORDER: Record<PriorityLevel, number> = {
   low: 3,
 };
 
-function findCardByTitle(title: string) {
-  const all = db.select().from(tasks).all();
+async function findCardByTitle(title: string) {
+  const all = await db.select().from(tasks);
   const lower = title.toLowerCase();
 
   const exact = all.find((t) => t.title.toLowerCase() === lower);
@@ -49,7 +49,7 @@ function findCardByTitle(title: string) {
   return all.find((t) => t.title.toLowerCase().includes(lower));
 }
 
-function executeGetTime(): ActionResult {
+async function executeGetTime(): Promise<ActionResult> {
   const now = new Date();
   const time = now.toLocaleTimeString("es-MX", {
     hour: "2-digit",
@@ -65,8 +65,8 @@ function executeGetTime(): ActionResult {
   return { ok: true, message: `${date} · ${time}` };
 }
 
-function executeGetTopPriority(count: number): ActionResult {
-  const all = db.select().from(tasks).all();
+async function executeGetTopPriority(count: number): Promise<ActionResult> {
+  const all = await db.select().from(tasks);
 
   const active = all.filter(
     (t) => t.status !== "archivado" && t.status !== "listo" && t.status !== "produccion",
@@ -101,8 +101,8 @@ function executeGetTopPriority(count: number): ActionResult {
   };
 }
 
-function executeMoveCard(title: string, status: string): ActionResult {
-  const card = findCardByTitle(title);
+async function executeMoveCard(title: string, status: string): Promise<ActionResult> {
+  const card = await findCardByTitle(title);
   if (!card) {
     return { ok: false, message: `Card no encontrada: "${title}"` };
   }
@@ -120,20 +120,18 @@ function executeMoveCard(title: string, status: string): ActionResult {
   const oldLabel = STATUS_LABELS[card.status as CardStatus] ?? card.status;
   const newLabel = STATUS_LABELS[status as CardStatus] ?? status;
 
-  db.update(tasks)
-    .set({ status, updatedAt: new Date().toISOString() })
-    .where(eq(tasks.id, card.id))
-    .run();
+  await db.update(tasks)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(tasks.id, card.id));
 
   syncBus.emitTaskUpdated(card.id, { projectId: card.projectId, status });
 
-  db.insert(events)
+  await db.insert(events)
     .values({
       id: `ev-${Date.now()}`,
       type: "command",
       message: `"${card.title}" → ${newLabel}`,
-    })
-    .run();
+    });
 
   return {
     ok: true,
@@ -142,7 +140,7 @@ function executeMoveCard(title: string, status: string): ActionResult {
   };
 }
 
-export function executeAction(action: ResolvedAction): ActionResult {
+export async function executeAction(action: ResolvedAction): Promise<ActionResult> {
   switch (action.type) {
     case "GET_TIME":
       return executeGetTime();

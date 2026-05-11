@@ -110,7 +110,7 @@ export async function runTerminalCommand(
       logs,
       rawText: result.message,
       structuredOutput: result.data,
-      meta: result.meta,
+      meta: undefined,
       isJson: false,
       hint: result.hint,
       error: result.ok ? undefined : result.message,

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const insights = runInsightEngine(body.projectId);
+    const insights = await runInsightEngine(body.projectId);
 
     return NextResponse.json({ ok: true, insights, count: insights.length });
   } catch (err) {

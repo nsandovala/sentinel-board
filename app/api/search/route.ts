@@ -18,8 +18,8 @@ function mapKnowledge(row: typeof knowledgeEntries.$inferSelect): KnowledgeEntry
     summary: row.summary ?? undefined,
     body: row.body,
     sourceTaskId: row.sourceTaskId ?? undefined,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
   };
 }
 

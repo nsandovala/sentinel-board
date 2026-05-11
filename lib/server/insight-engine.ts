@@ -42,10 +42,15 @@ function sanitizeText(text: string): string {
     .trim();
 }
 
-export function createInsight(input: CreateInsightInput): InsightEntry {
+function toIsoString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+export async function createInsight(input: CreateInsightInput): Promise<InsightEntry> {
   const id = `ins-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-  const row = db.insert(systemInsights)
+  const [row] = await db.insert(systemInsights)
     .values({
       id,
       projectId: input.projectId,
@@ -56,8 +61,7 @@ export function createInsight(input: CreateInsightInput): InsightEntry {
       summary: sanitizeText(input.summary),
       evidenceJson: input.evidenceJson ?? null,
     })
-    .returning()
-    .get();
+    .returning();
 
   syncBus.emitInsightCreated(id, { projectId: input.projectId });
 
@@ -71,15 +75,15 @@ export function createInsight(input: CreateInsightInput): InsightEntry {
     summary: row.summary,
     evidenceJson: row.evidenceJson as Record<string, unknown> | null,
     status: row.status as InsightStatus,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
   };
 }
 
-export function listInsights(options?: {
+export async function listInsights(options?: {
   projectId?: string;
   status?: InsightStatus;
-}): InsightEntry[] {
+}): Promise<InsightEntry[]> {
   const conditions = [];
 
   if (options?.projectId) {
@@ -89,12 +93,11 @@ export function listInsights(options?: {
     conditions.push(eq(systemInsights.status, options.status));
   }
 
-  const rows = db
+  const rows = await db
     .select()
     .from(systemInsights)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(systemInsights.createdAt))
-    .all();
+    .orderBy(desc(systemInsights.createdAt));
 
   return rows.map((row) => ({
     id: row.id,
@@ -106,24 +109,23 @@ export function listInsights(options?: {
     summary: row.summary,
     evidenceJson: row.evidenceJson as Record<string, unknown> | null,
     status: row.status as InsightStatus,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
   }));
 }
 
-export function updateInsightStatus(
+export async function updateInsightStatus(
   id: string,
   status: InsightStatus,
-): InsightEntry | null {
-  const updatedAt = new Date().toISOString();
-  db.update(systemInsights)
+): Promise<InsightEntry | null> {
+  const updatedAt = new Date();
+  await db.update(systemInsights)
     .set({ status, updatedAt })
-    .where(eq(systemInsights.id, id))
-    .run();
+    .where(eq(systemInsights.id, id));
 
   syncBus.emitInsightUpdated(id, { status });
 
-  const row = db.select().from(systemInsights).where(eq(systemInsights.id, id)).get();
+  const [row] = await db.select().from(systemInsights).where(eq(systemInsights.id, id)).limit(1);
   if (!row) return null;
 
   return {
@@ -136,22 +138,22 @@ export function updateInsightStatus(
     summary: row.summary,
     evidenceJson: row.evidenceJson as Record<string, unknown> | null,
     status: row.status as InsightStatus,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
   };
 }
 
-function getDaysAgo(days: number): string {
+function getDaysAgo(days: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString();
+  return d;
 }
 
-export function detectStaleCards(projectId: string): CreateInsightInput[] {
+export async function detectStaleCards(projectId: string): Promise<CreateInsightInput[]> {
   const staleDays = 14;
   const cutoff = getDaysAgo(staleDays);
 
-  const stale = db
+  const stale = await db
     .select()
     .from(tasks)
     .where(
@@ -160,12 +162,11 @@ export function detectStaleCards(projectId: string): CreateInsightInput[] {
         eq(tasks.status, "en_proceso"),
         gte(tasks.updatedAt, cutoff),
       ),
-    )
-    .all();
+    );
 
   const results: CreateInsightInput[] = [];
   for (const task of stale) {
-    const updated = new Date(task.updatedAt).getTime();
+    const updated = task.updatedAt instanceof Date ? task.updatedAt.getTime() : new Date(task.updatedAt).getTime();
     const now = Date.now();
     const daysStale = Math.floor((now - updated) / (1000 * 60 * 60 * 24));
 
@@ -177,7 +178,7 @@ export function detectStaleCards(projectId: string): CreateInsightInput[] {
         severity: daysStale >= 30 ? "high" : "medium",
         title: `Tarea stale: "${task.title}"`,
         summary: `Sin movimiento por ${daysStale} días en en_proceso`,
-        evidenceJson: { daysStale, lastUpdate: task.updatedAt, status: task.status },
+        evidenceJson: { daysStale, lastUpdate: toIsoString(task.updatedAt), status: task.status },
       });
     }
   }
@@ -185,12 +186,11 @@ export function detectStaleCards(projectId: string): CreateInsightInput[] {
   return results;
 }
 
-export function detectRepeatedBlocks(projectId: string): CreateInsightInput[] {
-  const blockedTasks = db
+export async function detectRepeatedBlocks(projectId: string): Promise<CreateInsightInput[]> {
+  const blockedTasks = await db
     .select()
     .from(tasks)
-    .where(and(eq(tasks.projectId, projectId), eq(tasks.blocked, true)))
-    .all();
+    .where(and(eq(tasks.projectId, projectId), eq(tasks.blocked, true)));
 
   const blockedByCount = new Map<string, number>();
   for (const task of blockedTasks) {
@@ -215,12 +215,11 @@ export function detectRepeatedBlocks(projectId: string): CreateInsightInput[] {
   return results;
 }
 
-export function detectHighValueIgnored(projectId: string): CreateInsightInput[] {
-  const allFeedback = db
+export async function detectHighValueIgnored(projectId: string): Promise<CreateInsightInput[]> {
+  const allFeedback = await db
     .select()
     .from(systemInsights)
-    .where(eq(systemInsights.projectId, projectId))
-    .all();
+    .where(eq(systemInsights.projectId, projectId));
 
   const relevantInsights = allFeedback.filter(
     (i) => i.type === "high_value_ignored" && i.status === "open",
@@ -242,22 +241,21 @@ export function detectHighValueIgnored(projectId: string): CreateInsightInput[] 
   return results;
 }
 
-export function detectFocusWithoutTaskProgress(projectId: string): CreateInsightInput[] {
-  const recentFocus = db
+export async function detectFocusWithoutTaskProgress(projectId: string): Promise<CreateInsightInput[]> {
+  const [recentFocus] = await db
     .select()
     .from(systemInsights)
     .where(and(eq(systemInsights.projectId, projectId), eq(systemInsights.type, "focus_without_progress")))
     .orderBy(desc(systemInsights.createdAt))
-    .limit(1)
-    .get();
+    .limit(1);
 
   if (recentFocus) {
-    const created = new Date(recentFocus.createdAt).getTime();
+    const created = recentFocus.createdAt instanceof Date ? recentFocus.createdAt.getTime() : new Date(recentFocus.createdAt).getTime();
     const hoursSince = (Date.now() - created) / (1000 * 60 * 60);
     if (hoursSince < 24) return [];
   }
 
-  const recentlyCompleted = db
+  const recentlyCompleted = await db
     .select()
     .from(tasks)
     .where(
@@ -266,10 +264,9 @@ export function detectFocusWithoutTaskProgress(projectId: string): CreateInsight
         eq(tasks.status, "listo"),
         gte(tasks.updatedAt, getDaysAgo(1)),
       ),
-    )
-    .all();
+    );
 
-  const noRecentFocus = db
+  const noRecentFocus = await db
     .select()
     .from(systemInsights)
     .where(
@@ -278,8 +275,7 @@ export function detectFocusWithoutTaskProgress(projectId: string): CreateInsight
         eq(systemInsights.type, "focus_without_progress"),
         gte(systemInsights.createdAt, getDaysAgo(1)),
       ),
-    )
-    .all();
+    );
 
   if (recentlyCompleted.length > 0 && noRecentFocus.length === 0) {
     return [{
@@ -295,7 +291,7 @@ export function detectFocusWithoutTaskProgress(projectId: string): CreateInsight
   return [];
 }
 
-export function runInsightEngine(projectId: string): InsightEntry[] {
+export async function runInsightEngine(projectId: string): Promise<InsightEntry[]> {
   const rules = [
     detectStaleCards,
     detectRepeatedBlocks,
@@ -307,9 +303,9 @@ export function runInsightEngine(projectId: string): InsightEntry[] {
 
   for (const rule of rules) {
     try {
-      const results = rule(projectId);
+      const results = await rule(projectId);
       for (const input of results) {
-        const existing = db
+        const [existing] = await db
           .select()
           .from(systemInsights)
           .where(
@@ -319,10 +315,10 @@ export function runInsightEngine(projectId: string): InsightEntry[] {
               eq(systemInsights.status, "open"),
             ),
           )
-          .get();
+          .limit(1);
 
         if (!existing) {
-          const created = createInsight(input);
+          const created = await createInsight(input);
           insights.push(created);
         }
       }

@@ -25,29 +25,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = new Date().toISOString();
+    const now = new Date();
 
     if (body.action === "start") {
       const id = `fs-${Date.now()}`;
-      db.insert(focusSessions)
+      await db.insert(focusSessions)
         .values({
           id,
           project: body.project ?? null,
           state: "running",
           startedAt: now,
           elapsedSeconds: 0,
-        })
-        .run();
+        });
       syncBus.emitFocusStarted(id, { project: body.project });
       return NextResponse.json({ ok: true, id, state: "running" });
     }
 
-    const current = db
+    const [current] = await db
       .select()
       .from(focusSessions)
       .where(eq(focusSessions.state, "running"))
       .orderBy(desc(focusSessions.startedAt))
-      .get();
+      .limit(1);
 
     if (!current) {
       return NextResponse.json(
@@ -77,10 +76,9 @@ export async function POST(req: NextRequest) {
       updates.state = "running";
     }
 
-    db.update(focusSessions)
+    await db.update(focusSessions)
       .set(updates)
-      .where(eq(focusSessions.id, current.id))
-      .run();
+      .where(eq(focusSessions.id, current.id));
 
     if (body.action === "end") {
       syncBus.emitFocusEnded(current.id, { project: current.project, elapsedSeconds: body.elapsedSeconds });
@@ -97,12 +95,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const rows = db
+    const rows = await db
       .select()
       .from(focusSessions)
       .orderBy(desc(focusSessions.startedAt))
-      .limit(20)
-      .all();
+      .limit(20);
     return NextResponse.json({ ok: true, sessions: rows });
   } catch (err) {
     return NextResponse.json(

@@ -19,8 +19,8 @@ function mapEntry(row: typeof knowledgeEntries.$inferSelect): KnowledgeEntry {
     summary: row.summary ?? undefined,
     body: row.body,
     sourceTaskId: row.sourceTaskId ?? undefined,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
   };
 }
 
@@ -86,8 +86,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = new Date().toISOString();
-
     await db
       .insert(knowledgeEntries)
       .values({
@@ -101,8 +99,6 @@ export async function POST(req: NextRequest) {
         summary: body.summary ?? null,
         body: body.body,
         sourceTaskId: body.sourceTaskId ?? null,
-        createdAt: now,
-        updatedAt: now,
       });
 
     return NextResponse.json({ ok: true, id: body.id });
