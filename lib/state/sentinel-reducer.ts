@@ -53,6 +53,8 @@ export type SentinelAction =
   | { type: "ADD_COMMENT"; comment: CardComment }
   | { type: "START_FOCUS"; project?: string }
   | { type: "END_FOCUS" }
+  | { type: "PAUSE_FOCUS" }
+  | { type: "RESUME_FOCUS" }
   | { type: "TICK_FOCUS" };
 
 let eventSeq = 100;
@@ -237,6 +239,20 @@ export function sentinelReducer(
         events: [...state.events, createEvent("focus", label)],
       };
     }
+
+    case "PAUSE_FOCUS":
+      if (state.focusSession.state !== "running") return state;
+      return {
+        ...state,
+        focusSession: { ...state.focusSession, state: "paused" },
+      };
+
+    case "RESUME_FOCUS":
+      if (state.focusSession.state !== "paused") return state;
+      return {
+        ...state,
+        focusSession: { ...state.focusSession, state: "running" },
+      };
 
     case "TICK_FOCUS":
       if (state.focusSession.state !== "running") return state;

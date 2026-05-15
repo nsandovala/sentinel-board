@@ -243,6 +243,44 @@
     box-shadow: inset -1px 0 0 oklch(0.48 0.05 292 / 0.15);
   }
 
+  /* Deep-link highlight: matte glow that fades out. Used by CardItem when
+     focusCardById() targets it. Animation is short and subdued to fit the
+     dev-matte aesthetic. */
+  .sentinel-card-focus {
+    animation: sentinel-card-focus-pulse 1.8s ease-out forwards;
+  }
+
+  @keyframes sentinel-card-focus-pulse {
+    0% {
+      box-shadow:
+        0 0 0 1px oklch(0.62 0.08 292 / 0.55),
+        0 0 18px 2px oklch(0.58 0.08 292 / 0.28),
+        0 10px 24px oklch(0 0 0 / 0.38);
+    }
+    60% {
+      box-shadow:
+        0 0 0 1px oklch(0.58 0.07 292 / 0.32),
+        0 0 14px 2px oklch(0.54 0.07 292 / 0.18),
+        0 10px 24px oklch(0 0 0 / 0.38);
+    }
+    100% {
+      box-shadow:
+        0 0 0 1px oklch(0.5 0.03 292 / 0),
+        0 0 0 0 oklch(0.5 0.03 292 / 0),
+        0 10px 24px oklch(0 0 0 / 0.38);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sentinel-card-focus {
+      animation: none;
+      box-shadow:
+        0 0 0 1px oklch(0.6 0.07 292 / 0.45),
+        0 0 12px 2px oklch(0.55 0.07 292 / 0.22),
+        0 10px 24px oklch(0 0 0 / 0.38);
+    }
+  }
+
   .sentinel-nav-pip {
     background: linear-gradient(
       180deg,

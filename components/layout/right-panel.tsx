@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Terminal, Cpu, Clock, Sparkles, Copy, Trash2, MessageSquare, Send } from "lucide-react";
+import { Terminal, Cpu, Clock, Sparkles, Copy, Trash2, MessageSquare, Send, Crosshair } from "lucide-react";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import { focusCardById } from "@/lib/board/focus-card";
 import type { CommentType } from "@/types/comment";
 import { eventRelatesToProject } from "@/lib/state/sentinel-reducer";
 import { generateCodexLoop } from "@/lib/console/codex-loop-generator";
@@ -314,6 +315,15 @@ function SuggestedNextActionSection({
           </p>
           <DockCommandSnippetBlock command={command} />
         </div>
+        <button
+          type="button"
+          onClick={() => focusCardById(card.id)}
+          className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-border/30 bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
+          title="Localizar tarjeta en el board"
+        >
+          <Crosshair className="h-3 w-3" />
+          Abrir en Board
+        </button>
       </div>
     </section>
   );

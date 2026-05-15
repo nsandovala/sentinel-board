@@ -22,6 +22,7 @@ import type { DockEvent } from "@/types/event";
 import type { Project } from "@/types/project";
 import type { CardStatus } from "@/types/enums";
 import type { KnowledgeEntry } from "@/types/knowledge";
+import { FOCUS_CARD_EVENT, type FocusCardDetail } from "@/lib/board/focus-card";
 
 const initialState: SentinelState = {
   projects: [],
@@ -237,6 +238,22 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
     state.priorityFilter,
     state.tagFilter,
   ]);
+
+  // Centralised reaction to focus-card requests: any module that calls
+  // `focusCardById(id)` triggers SELECT_CARD + switch to board view here.
+  // Scroll/highlight is owned by the CardItem listener.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<FocusCardDetail>).detail;
+      const cardId = detail?.cardId;
+      if (!cardId) return;
+      rawDispatch({ type: "SET_VIEW", view: "board" });
+      rawDispatch({ type: "SELECT_CARD", cardId });
+      loadCardComments(cardId, rawDispatch);
+    };
+    window.addEventListener(FOCUS_CARD_EVENT, handler);
+    return () => window.removeEventListener(FOCUS_CARD_EVENT, handler);
+  }, []);
 
   return (
     <StateCtx.Provider value={state}>

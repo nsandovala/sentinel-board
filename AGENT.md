@@ -2,6 +2,8 @@
 
 Este archivo es el contrato de arquitectura para cualquier agente (humano o IA) que asista en el desarrollo de Sentinel Board. Define las reglas de interaccion, componentes reales, y protocolos vigentes.
 
+> **Contexto estrategico**: Antes de modificar cualquier componente, revisar `ROADMAP.md` para entender la fase actual y las prioridades del plan operativo MVP (Sentinel Board + AMON Agents).
+
 ---
 
 ## I. Vision General

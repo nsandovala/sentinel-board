@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Trash2 } from "lucide-react";
 import { SentinelCard, ChecklistItemStatus } from "@/types/card";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import { FOCUS_CARD_EVENT, type FocusCardDetail } from "@/lib/board/focus-card";
+
+const HIGHLIGHT_MS = 1800;
 
 const priorityConfig: Record<string, { classes: string; label: string }> = {
   low: { classes: "border border-border/50 bg-muted/90 text-muted-foreground", label: "Low" },
@@ -145,11 +148,67 @@ export function CardItem({ card }: CardItemProps) {
   const isSelected = selectedCardId === card.id;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
     data: { card },
   });
+
+  const composedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      nodeRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef],
+  );
+
+  useEffect(() => {
+    const triggerFocus = () => {
+      const node = nodeRef.current;
+      if (node) {
+        node.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+      setHighlighted(true);
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlighted(false);
+        highlightTimeoutRef.current = null;
+      }, HIGHLIGHT_MS);
+    };
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<FocusCardDetail>).detail;
+      if (detail?.cardId !== card.id) return;
+      triggerFocus();
+    };
+    window.addEventListener(FOCUS_CARD_EVENT, handler);
+
+    // Self-focus on mount when the deep-link URL targets us. Covers the
+    // refresh-on-/board?card=X case and the case where the user switched
+    // from timeline/backlog into the board view after the focus event was
+    // already dispatched.
+    let rafId: number | null = null;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("card") === card.id) {
+        rafId = requestAnimationFrame(triggerFocus);
+      }
+    }
+
+    return () => {
+      window.removeEventListener(FOCUS_CARD_EVENT, handler);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+  }, [card.id]);
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
@@ -182,12 +241,13 @@ export function CardItem({ card }: CardItemProps) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={composedRef}
       style={style}
       {...listeners}
       {...attributes}
       role="button"
       tabIndex={0}
+      data-card-id={card.id}
       onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -199,6 +259,7 @@ export function CardItem({ card }: CardItemProps) {
         "sentinel-board-card sentinel-board-ticket group relative flex cursor-grab flex-col gap-1.5 border p-2.5 pl-3",
         "transition-[background-color,border-color,box-shadow] duration-200 ease-out outline-none",
         isSelected && "sentinel-card-iridescent",
+        highlighted && "sentinel-card-focus",
         isDragging && "opacity-30",
       )}
     >

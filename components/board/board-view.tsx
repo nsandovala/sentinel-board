@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -29,6 +30,7 @@ import {
   filterEventsByProjectId,
 } from "@/lib/state/sentinel-reducer";
 import { scoreAndSortBacklog } from "@/lib/scoring/backlog-scorer";
+import { focusCardById } from "@/lib/board/focus-card";
 
 const statusColumns: { key: CardStatus; label: string }[] = [
   { key: "idea_bruta", label: "Idea Bruta" },
@@ -102,12 +104,10 @@ function resolveCardFromTimelineMessage(message: string, cards: SentinelCard[]):
 }
 
 function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelCard[] }) {
-  const dispatch = useSentinelDispatch();
   const sorted = [...events].reverse();
 
   const openCard = (cardId: string) => {
-    dispatch({ type: "SELECT_CARD", cardId });
-    dispatch({ type: "SET_VIEW", view: "board" });
+    focusCardById(cardId);
   };
 
   return (
@@ -311,10 +311,7 @@ function BacklogView({
           <button
             key={card.id}
             type="button"
-            onClick={() => {
-              dispatch({ type: "SELECT_CARD", cardId: card.id });
-              dispatch({ type: "SET_VIEW", view: "board" });
-            }}
+            onClick={() => focusCardById(card.id)}
             className="sentinel-backlog-row flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors"
           >
             {card.blocked && (
@@ -358,6 +355,25 @@ export function BoardView() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  // Deep-link: read `?card=` and focus the matching card. The lookup runs
+  // again once cards hydrate so the focus survives the initial empty state.
+  // We track the last id we acted on so the effect is idempotent across
+  // re-renders triggered by unrelated state updates.
+  const searchParams = useSearchParams();
+  const cardParam = searchParams?.get("card") ?? null;
+  const lastFocusedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!cardParam) {
+      lastFocusedRef.current = null;
+      return;
+    }
+    if (lastFocusedRef.current === cardParam) return;
+    if (!cards.some((c) => c.id === cardParam)) return;
+    lastFocusedRef.current = cardParam;
+    focusCardById(cardParam);
+  }, [cardParam, cards]);
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {

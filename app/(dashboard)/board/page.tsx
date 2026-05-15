@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { BoardView } from "@/components/board/board-view";
 
 export default function BoardPage() {
-  return <BoardView />;
+  return (
+    <Suspense fallback={null}>
+      <BoardView />
+    </Suspense>
+  );
 }

@@ -20,6 +20,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
+import { focusCardById } from "@/lib/board/focus-card";
 
 export type TerminalStatus = "idle" | "running" | "success" | "error";
 
@@ -44,6 +45,16 @@ const ANSI = {
   magenta: "\x1b[35m",
   bold: "\x1b[1m",
 } as const;
+
+function pickCardIdFromOutput(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  const candidates = [obj.cardId, obj.card_id, obj.id, obj.taskId, obj.task_id];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.length > 0) return c;
+  }
+  return null;
+}
 
 export function useTerminal(onRefresh?: () => void) {
   const termRef = useRef<Terminal | null>(null);
@@ -123,6 +134,14 @@ export function useTerminal(onRefresh?: () => void) {
           if (data.hint === "refresh_board") {
             term.writeln(`${ANSI.yellow}  sync board...${ANSI.reset}`);
             onRefresh?.();
+          }
+
+          // If the server returned a card id in the structured payload,
+          // surface the card in the board via the shared focus helper.
+          // Safe no-op when no id is present.
+          const focusId = pickCardIdFromOutput(data.structuredOutput);
+          if (focusId) {
+            focusCardById(focusId);
           }
 
           setState({ status: "success", provider: data.provider });
