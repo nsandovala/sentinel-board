@@ -63,7 +63,7 @@ export function AppSidebar() {
       </div>
 
       {/* Workspace */}
-      <div className="border-b border-sidebar-border px-4 py-3.5">
+      <div className="shrink-0 border-b border-sidebar-border px-4 py-3.5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border/35 bg-muted/80 text-[11px] font-semibold text-foreground/90">
             NS
@@ -80,7 +80,7 @@ export function AppSidebar() {
       </div>
 
       {/* Live stats */}
-      <div className="border-b border-sidebar-border px-4 py-3.5">
+      <div className="shrink-0 border-b border-sidebar-border px-4 py-3.5">
         <p className="sentinel-rail-section-label mb-2.5">
           Resumen{selectedProjectId ? " (proyecto)" : ""}
         </p>
@@ -102,7 +102,7 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <div className="border-b border-sidebar-border px-3 py-2.5">
+      <div className="shrink-0 border-b border-sidebar-border px-3 py-2.5">
         <nav className="flex flex-col gap-0.5">
           {views.map((v) => (
             <button
@@ -132,7 +132,7 @@ export function AppSidebar() {
 
       {/* Projects */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
+        <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-3.5">
           <p className="sentinel-rail-section-label">Proyectos</p>
           <span className="text-[11px] tabular-nums text-muted-foreground">
             {projects.length}
@@ -187,7 +187,7 @@ export function AppSidebar() {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border px-4 py-2.5">
+      <div className="shrink-0 border-t border-sidebar-border px-4 py-2.5">
         <span className="text-[11px] text-muted-foreground">v0.1.0</span>
       </div>
     </aside>

@@ -33,7 +33,7 @@ export function CommandMode({
         onOpenMoveState={onOpenMoveState}
         focusRunning={focusRunning}
       />
-      <p className="col-span-full text-[10px] leading-snug text-muted-foreground/55 md:col-span-2">
+      <p className="col-span-full text-[10px] leading-snug text-muted-foreground/75 md:col-span-2">
         El input vive abajo y es compartido por todos los modos. El historial completo está en Timeline.
       </p>
     </div>

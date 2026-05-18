@@ -30,6 +30,8 @@ const DOCK_HEIGHT_STORAGE_KEY = "sentinel:dock-height";
 const DOCK_MIN_HEIGHT = 240;
 const DOCK_DEFAULT_HEIGHT = 340;
 const DOCK_COLLAPSED_HEIGHT = 48;
+const DOCK_MAX_VH = 0.65;
+const DOCK_MAX_HARD_CAP = 760;
 
 const LIVE_INTENT_ES: Record<CommandIntent, string> = {
   create_task: "Crear tarea",
@@ -54,12 +56,13 @@ const RUNTIME_FOOTER_HINT =
   "Runtime aún no recibe comandos. Solo muestra estado de agentes.";
 
 function getDockMaxHeight(): number {
-  if (typeof window === "undefined") return 520;
-  return Math.min(Math.max(window.innerHeight - 180, DOCK_MIN_HEIGHT), 520);
+  if (typeof window === "undefined") return DOCK_MAX_HARD_CAP;
+  const vhCap = Math.floor(window.innerHeight * DOCK_MAX_VH);
+  return Math.max(DOCK_MIN_HEIGHT, Math.min(vhCap, DOCK_MAX_HARD_CAP));
 }
 
 function clampDockHeight(height: number): number {
-  return Math.min(Math.max(height, DOCK_MIN_HEIGHT), getDockMaxHeight());
+  return Math.min(Math.max(Math.round(height), DOCK_MIN_HEIGHT), getDockMaxHeight());
 }
 
 function buildLiveSuggestions(
@@ -566,31 +569,41 @@ export function DockWorkspace() {
           <span className="h-1 w-14 rounded-full bg-border/70 transition-colors group-hover:bg-muted-foreground/70" />
         </button>
 
-        <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-border/30 px-1 py-1">
+        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-border/30 px-1 py-0.5">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground/60 transition-colors hover:text-foreground/80"
+            className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground/70 transition-colors hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
             aria-label={expanded ? "Colapsar HEO Copilot" : "Expandir HEO Copilot"}
             aria-expanded={expanded}
+            title={expanded ? "Colapsar (mostrar solo barra)" : "Expandir HEO Copilot"}
           >
             {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+            <span className="text-[11px] font-semibold tracking-tight text-foreground/85">
+              HEO Copilot
+            </span>
           </button>
 
-          <DockModeTabs active={mode} onChange={setMode} />
+          {expanded ? (
+            <>
+              <DockModeTabs active={mode} onChange={setMode} />
 
-          <div className="ml-2 hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
-            <span className="truncate text-[11px] font-semibold tracking-tight text-foreground/85">
-              {MODE_TITLES[mode]}
+              <div className="ml-2 hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
+                <span className="truncate text-[11px] font-semibold tracking-tight text-foreground/85">
+                  {MODE_TITLES[mode]}
+                </span>
+                <span className="truncate text-[10px] text-muted-foreground/70">
+                  {lastResultMessage
+                    ? lastResultMessage
+                    : `${MODE_HINTS[mode]} · Altura ${dockHeight}px`}
+                </span>
+              </div>
+            </>
+          ) : (
+            <span className="ml-1 truncate text-[11px] uppercase tracking-wider text-muted-foreground/70">
+              {mode === "command" ? "Execute" : mode === "analyze" ? "Analyze" : mode === "focus" ? "Focus" : "Runtime"}
             </span>
-            <span className="truncate text-[10px] text-muted-foreground/70">
-              {lastResultMessage
-                ? lastResultMessage
-                : expanded
-                  ? `${MODE_HINTS[mode]} · Altura ${dockHeight}px`
-                  : "Colapsado · expande el copilot para ejecutar acciones"}
-            </span>
-          </div>
+          )}
 
           <span
             className={cn(
@@ -616,24 +629,26 @@ export function DockWorkspace() {
             {statusBadgeLabel}
           </span>
 
-          <button
-            type="button"
-            onClick={() => setMode("focus")}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-mono tabular-nums transition-colors",
-              focusChipState === "running"
-                ? "border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
-                : focusChipState === "paused"
-                  ? "border-border/40 bg-muted/40 text-muted-foreground hover:text-foreground/80"
-                  : "border-border/35 bg-background/40 text-muted-foreground/70 hover:text-foreground/70",
-            )}
-            title="Abrir modo Focus"
-            aria-label={`Foco ${focusChipState}, abrir modo Focus`}
-          >
-            <Clock className="h-3 w-3" />
-            {formatChipElapsed(state.focusSession.elapsed)}
-            {focusChipState === "paused" && <span className="text-[9px] uppercase">pausa</span>}
-          </button>
+          {expanded && (
+            <button
+              type="button"
+              onClick={() => setMode("focus")}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-mono tabular-nums transition-colors",
+                focusChipState === "running"
+                  ? "border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
+                  : focusChipState === "paused"
+                    ? "border-border/40 bg-muted/40 text-muted-foreground hover:text-foreground/80"
+                    : "border-border/35 bg-background/40 text-muted-foreground/70 hover:text-foreground/70",
+              )}
+              title="Abrir modo Focus"
+              aria-label={`Foco ${focusChipState}, abrir modo Focus`}
+            >
+              <Clock className="h-3 w-3" />
+              {formatChipElapsed(state.focusSession.elapsed)}
+              {focusChipState === "paused" && <span className="text-[9px] uppercase">pausa</span>}
+            </button>
+          )}
         </div>
 
         {expanded && (
@@ -676,7 +691,6 @@ export function DockWorkspace() {
 
               {mode === "focus" && (
                 <FocusMode
-                  expanded={expanded}
                   session={state.focusSession}
                   activeCard={activeCard}
                   projectName={defaultProjectName}

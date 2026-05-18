@@ -15,7 +15,6 @@ function formatElapsed(seconds: number): string {
 }
 
 interface FocusModeProps {
-  expanded: boolean;
   session: FocusSession;
   activeCard: SentinelCard | null;
   projectName?: string;
@@ -26,7 +25,6 @@ interface FocusModeProps {
 }
 
 export function FocusMode({
-  expanded,
   session,
   activeCard,
   projectName,
@@ -38,23 +36,24 @@ export function FocusMode({
   const running = session.state === "running";
   const paused = session.state === "paused";
   const idle = !running && !paused;
-
   const stateLabel = running ? "EN CURSO" : paused ? "EN PAUSA" : "DETENIDO";
-
   const stateClass = running
     ? "text-amber-300/95"
     : paused
       ? "text-muted-foreground"
-      : "text-muted-foreground/65";
+      : "text-muted-foreground/60";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 px-4 py-3">
-      <div className="flex flex-wrap items-center gap-4 gap-y-2">
+    <div className="flex flex-col gap-2.5 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-3 gap-y-1.5">
         <div className="flex items-center gap-2">
-          <Clock className={cn("h-4 w-4", running ? "text-amber-400" : "text-muted-foreground/60")} aria-hidden />
+          <Clock
+            className={cn("h-4 w-4", running ? "text-amber-400" : "text-muted-foreground/55")}
+            aria-hidden
+          />
           <span
             className={cn(
-              "font-mono text-2xl tabular-nums tracking-tight",
+              "font-mono text-xl tabular-nums tracking-tight",
               running ? "text-foreground" : "text-foreground/70",
             )}
             aria-live="polite"
@@ -62,18 +61,23 @@ export function FocusMode({
             {formatElapsed(session.elapsed)}
           </span>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", stateClass)}>
-            {stateLabel}
-          </span>
-          <span className="text-[11px] text-muted-foreground">
-            {session.project
-              ? `Proyecto: ${session.project}`
-              : projectName
-                ? `Sugerido: ${projectName}`
-                : "Sin proyecto asignado"}
-          </span>
-        </div>
+
+        <span
+          className={cn(
+            "rounded-md border border-border/30 bg-background/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]",
+            stateClass,
+          )}
+        >
+          {stateLabel}
+        </span>
+
+        <span className="truncate text-[11px] text-muted-foreground">
+          {session.project
+            ? `Proyecto: ${session.project}`
+            : projectName
+              ? `Sugerido: ${projectName}`
+              : "Sin proyecto asignado"}
+        </span>
 
         <div className="ml-auto flex flex-wrap gap-1.5">
           {idle && (
@@ -110,7 +114,7 @@ export function FocusMode({
             <button
               type="button"
               onClick={onEnd}
-              className="flex h-7 items-center gap-1.5 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/15"
+              className="flex h-7 items-center gap-1.5 rounded-md border border-red-500/25 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition-colors hover:bg-red-500/15"
             >
               <Square className="h-3 w-3" />
               Finalizar
@@ -119,33 +123,32 @@ export function FocusMode({
         </div>
       </div>
 
-      {expanded && (
-        <section className="sentinel-glass-panel--subtle rounded-md p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-            Tarea activa
-          </p>
-          {activeCard ? (
-            <div className="mt-2 space-y-1.5">
-              <p className="text-[13px] font-medium text-foreground">{activeCard.title}</p>
-              <p className="text-[11px] text-muted-foreground">
-                Estado: {activeCard.status} · Prioridad: {activeCard.priority}
-              </p>
-              <button
-                type="button"
-                onClick={() => focusCardById(activeCard.id)}
-                className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border/30 bg-muted/40 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
-              >
-                <Crosshair className="h-3 w-3" />
-                Localizar en board
-              </button>
-            </div>
-          ) : (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Sin card seleccionada. Elige una tarjeta del board para asociarla a esta sesión.
-            </p>
-          )}
-        </section>
-      )}
+      <div className="flex items-center gap-2 border-t border-border/25 pt-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          Tarea activa
+        </span>
+        {activeCard ? (
+          <>
+            <span className="truncate text-[12px] text-foreground/85">{activeCard.title}</span>
+            <span className="shrink-0 rounded border border-border/30 bg-muted/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+              {activeCard.status}
+            </span>
+            <button
+              type="button"
+              onClick={() => focusCardById(activeCard.id)}
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-border/30 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-foreground"
+              title="Localizar tarjeta en el board"
+            >
+              <Crosshair className="h-3 w-3" />
+              Localizar
+            </button>
+          </>
+        ) : (
+          <span className="text-[11px] text-muted-foreground/65">
+            Sin card seleccionada · elige una tarjeta del board para vincularla.
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -64,7 +64,7 @@ export function AnalyzeMode({
             <span className="text-foreground/80">Crear en board</span>.
           </p>
         </div>
-        <p className="text-[10px] leading-snug text-muted-foreground/55">
+        <p className="text-[10px] leading-snug text-muted-foreground/75">
           El historial de comandos vive en el Timeline.
         </p>
       </aside>

@@ -145,40 +145,15 @@
  */
 @layer utilities {
   .sentinel-command-dock {
+    /* Dev-matte: superficie carbón sólido, sin gradiente iridiscente.
+       El acento superior se reduce a un borde fino. */
     background-color: var(--dock-surface);
-    background-image: linear-gradient(
-        90deg,
-        oklch(0.6 0.012 285 / 0.12),
-        oklch(0.5 0.01 282 / 0.06),
-        oklch(0.56 0.014 275 / 0.08),
-        oklch(0.48 0.01 280 / 0.05)
-      ),
-      linear-gradient(var(--dock-surface), var(--dock-surface));
-    background-size:
-      100% 1px,
-      100% 100%;
-    background-repeat: no-repeat;
-    background-position:
-      top left,
-      0 0;
+    box-shadow: inset 0 1px 0 oklch(0.55 0.01 285 / 0.08);
   }
 
   .sentinel-dock-expanded {
     background-color: var(--dock-elevated);
-    background-image: linear-gradient(
-        90deg,
-        oklch(0.55 0.012 285 / 0.08),
-        oklch(0.46 0.01 282 / 0.05),
-        oklch(0.52 0.012 275 / 0.07)
-      ),
-      linear-gradient(var(--dock-elevated), var(--dock-elevated));
-    background-size:
-      100% 1px,
-      100% 100%;
-    background-repeat: no-repeat;
-    background-position:
-      top left,
-      0 0;
+    box-shadow: inset 0 1px 0 oklch(0.5 0.01 285 / 0.05);
   }
 
   .sentinel-focus-chrome {

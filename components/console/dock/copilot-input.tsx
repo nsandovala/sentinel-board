@@ -184,7 +184,7 @@ export function CopilotInput({
             </div>
           ) : null}
           {footerHint ? (
-            <p className="text-[10px] leading-snug text-muted-foreground/55">{footerHint}</p>
+            <p className="text-[10px] leading-snug text-muted-foreground/70">{footerHint}</p>
           ) : null}
         </div>
       )}
