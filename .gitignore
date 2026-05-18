@@ -44,20 +44,7 @@ yarn-error.log*
 outputs/
 *.log
 *.log*
-docs
-.md
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-*.svg
-*.ico
-*.xml
-*.json
-*.txt
-*.yml
-*.lock
+
 
 # vercel
 .vercel
