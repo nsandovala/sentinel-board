@@ -13,10 +13,10 @@ interface ModeDef {
 }
 
 const MODES: ModeDef[] = [
-  { key: "command", label: "Command", icon: Terminal },
+  { key: "command", label: "Execute", icon: Terminal },
   { key: "analyze", label: "Analyze", icon: Sparkles },
   { key: "focus", label: "Focus", icon: Clock },
-  { key: "agents", label: "Agents", icon: Bot },
+  { key: "agents", label: "Runtime", icon: Bot },
 ];
 
 interface DockModeTabsProps {

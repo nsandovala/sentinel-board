@@ -84,42 +84,42 @@
 
 .dark {
   /* Industrial dark mate: lectura clara en títulos, metadata contenida */
-  --background: oklch(0.078 0.003 285);
-  --foreground: oklch(0.93 0.004 285);
-  --card: oklch(0.115 0.004 285);
-  --card-foreground: oklch(0.93 0.004 285);
-  --popover: oklch(0.112 0.004 285);
-  --popover-foreground: oklch(0.93 0.004 285);
+  --background: oklch(0.07 0.003 285);
+  --foreground: oklch(0.94 0.003 285);
+  --card: oklch(0.105 0.004 285);
+  --card-foreground: oklch(0.94 0.003 285);
+  --popover: oklch(0.102 0.004 285);
+  --popover-foreground: oklch(0.94 0.003 285);
   /* Acento principal: violeta medio-bajo L, croma contenido */
   --primary: oklch(0.44 0.088 283);
   --primary-foreground: oklch(0.97 0.012 285);
-  --secondary: oklch(0.155 0.005 285);
-  --secondary-foreground: oklch(0.84 0.012 285);
-  --muted: oklch(0.145 0.004 285);
-  --muted-foreground: oklch(0.52 0.016 282);
-  --accent: oklch(0.154 0.007 283);
-  --accent-foreground: oklch(0.9 0.005 285);
+  --secondary: oklch(0.138 0.004 285);
+  --secondary-foreground: oklch(0.87 0.01 285);
+  --muted: oklch(0.13 0.004 285);
+  --muted-foreground: oklch(0.64 0.012 282);
+  --accent: oklch(0.138 0.006 283);
+  --accent-foreground: oklch(0.92 0.004 285);
   --destructive: oklch(0.5 0.15 25);
   /* Borde global: humo frío (más L, menos dureza que un gris cerrado) */
-  --border: oklch(0.4 0.014 282);
-  --input: oklch(0.2 0.01 285);
+  --border: oklch(0.33 0.01 282);
+  --input: oklch(0.17 0.007 285);
   --ring: oklch(0.5 0.06 283);
   --chart-1: oklch(0.52 0.09 282);
   --chart-2: oklch(0.48 0.095 278);
   --chart-3: oklch(0.44 0.09 275);
   --chart-4: oklch(0.4 0.085 272);
   --chart-5: oklch(0.36 0.08 268);
-  --sidebar: oklch(0.088 0.002 285);
-  --sidebar-foreground: oklch(0.86 0.007 285);
+  --sidebar: oklch(0.082 0.002 285);
+  --sidebar-foreground: oklch(0.89 0.006 285);
   --sidebar-primary: oklch(0.44 0.088 283);
   --sidebar-primary-foreground: oklch(0.97 0.012 285);
-  --sidebar-accent: oklch(0.138 0.007 283);
-  --sidebar-accent-foreground: oklch(0.86 0.01 285);
-  --sidebar-border: oklch(0.38 0.013 283);
+  --sidebar-accent: oklch(0.128 0.006 283);
+  --sidebar-accent-foreground: oklch(0.88 0.01 285);
+  --sidebar-border: oklch(0.31 0.01 283);
   --sidebar-ring: oklch(0.5 0.06 283);
   /* Dock: carbón sólido, ribete superior más “nieve” que neón */
-  --dock-surface: oklch(0.056 0.005 285);
-  --dock-elevated: oklch(0.07 0.006 285);
+  --dock-surface: oklch(0.048 0.004 285);
+  --dock-elevated: oklch(0.062 0.005 285);
 }
 
 @layer base {
@@ -148,10 +148,10 @@
     background-color: var(--dock-surface);
     background-image: linear-gradient(
         90deg,
-        oklch(0.72 0.02 285 / 0.14),
-        oklch(0.58 0.018 282 / 0.08),
-        oklch(0.65 0.022 275 / 0.1),
-        oklch(0.55 0.016 280 / 0.07)
+        oklch(0.6 0.012 285 / 0.12),
+        oklch(0.5 0.01 282 / 0.06),
+        oklch(0.56 0.014 275 / 0.08),
+        oklch(0.48 0.01 280 / 0.05)
       ),
       linear-gradient(var(--dock-surface), var(--dock-surface));
     background-size:
@@ -167,9 +167,9 @@
     background-color: var(--dock-elevated);
     background-image: linear-gradient(
         90deg,
-        oklch(0.68 0.018 285 / 0.1),
-        oklch(0.52 0.014 282 / 0.06),
-        oklch(0.6 0.017 275 / 0.08)
+        oklch(0.55 0.012 285 / 0.08),
+        oklch(0.46 0.01 282 / 0.05),
+        oklch(0.52 0.012 275 / 0.07)
       ),
       linear-gradient(var(--dock-elevated), var(--dock-elevated));
     background-size:
@@ -310,15 +310,15 @@
   /* Paneles: superficie sólida industrial (sin glass acuoso) */
   .sentinel-glass-panel {
     border-radius: 0.5625rem;
-    border: 1px solid oklch(0.38 0.01 285 / 0.55);
-    background-color: oklch(0.125 0.004 285);
-    box-shadow: inset 0 1px 0 oklch(0.52 0.012 285 / 0.06);
+    border: 1px solid oklch(0.31 0.008 285 / 0.65);
+    background-color: oklch(0.11 0.004 285);
+    box-shadow: inset 0 1px 0 oklch(0.44 0.01 285 / 0.04);
   }
 
   .sentinel-glass-panel--subtle {
-    border-color: oklch(0.36 0.009 285 / 0.42);
-    background-color: oklch(0.118 0.004 285);
-    box-shadow: inset 0 1px 0 oklch(0.48 0.01 285 / 0.045);
+    border-color: oklch(0.3 0.008 285 / 0.44);
+    background-color: oklch(0.105 0.004 285);
+    box-shadow: inset 0 1px 0 oklch(0.42 0.01 285 / 0.035);
   }
 
   /* Jerarquía tipo producto (oscuro mate) */

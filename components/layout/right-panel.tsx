@@ -193,7 +193,7 @@ function projectSuggestedNextStep(
   const idea = pc.find((c) => c.status === "idea_bruta");
   if (idea) {
     return {
-      explanation: `Convertí la idea bruta «${idea.title}» en trabajo clarificado.`,
+      explanation: `Convierte la idea bruta «${idea.title}» en trabajo clarificado.`,
       command: `mover "${idea.title}" a clarificando`,
     };
   }
@@ -204,7 +204,7 @@ function projectSuggestedNextStep(
 
   if (!focusHere) {
     return {
-      explanation: "Encadená un bloque corto de foco sobre este proyecto.",
+      explanation: "Inicia un bloque corto de foco sobre este proyecto.",
       command: `iniciar foco en ${project.name}`,
     };
   }
@@ -217,13 +217,13 @@ function projectSuggestedNextStep(
   );
   if (inFlight) {
     return {
-      explanation: `Avanzá «${inFlight.title}» o cerrá ítems de checklist pendientes.`,
+      explanation: `Avanza «${inFlight.title}» o cierra ítems de checklist pendientes.`,
       command: `mover "${inFlight.title}" a qa`,
     };
   }
 
   return {
-    explanation: "Revisá el timeline filtrado y registrá tiempo al cerrar el bloque.",
+    explanation: "Revisa el timeline filtrado y registra tiempo al cerrar el bloque.",
     command: `registrar 25 minutos en ${project.name}`,
   };
 }
@@ -283,18 +283,18 @@ function SuggestedNextActionSection({
     explanation = "Está bloqueada: aclara el bloqueo o muévela a clarificación para desatascar.";
     command = `mover "${card.title}" a clarificando`;
   } else if (card.status === "idea_bruta") {
-    explanation = "Sigue en idea bruta: refiná el alcance o pasala a clarificando.";
+    explanation = "Sigue en idea bruta: refina el alcance o muévela a clarificando.";
     command = `mover "${card.title}" a clarificando`;
   } else if (pendingCheck > 0 && card.status !== "desarrollo" && card.status !== "qa") {
-    explanation = `Hay ${pendingCheck} ítem(s) de checklist pendientes; acercala al trabajo activo.`;
+    explanation = `Hay ${pendingCheck} ítem(s) de checklist pendientes; muévela al trabajo activo.`;
     command = `mover "${card.title}" a desarrollo`;
   } else if (card.status === "qa" || card.status === "listo") {
-    explanation = "En validación o listo: cerrá el ciclo o retrocedé si falta evidencia.";
+    explanation = "En validación o listo: cierra el ciclo o retrocede si falta evidencia.";
     command = `mover "${card.title}" a produccion`;
   } else {
     explanation =
       loop.nextStep?.trim() ||
-      "Usá foco breve sobre el proyecto y registrá tiempo al cerrar el bloque.";
+      "Usa foco breve sobre el proyecto y registra tiempo al cerrar el bloque.";
     command = projectName ? `iniciar foco en ${projectName}` : "iniciar foco";
   }
 
@@ -553,10 +553,10 @@ function EmptyState() {
 
       <div className="border-t border-sidebar-border px-5 py-4">
         <p className="text-center text-[13px] font-semibold tracking-[-0.01em] text-foreground">
-          Seleccioná una tarjeta
+          Selecciona una tarjeta
         </p>
         <p className="sentinel-rail-meta mt-1.5 text-center text-[11px]">
-          Verás Codex Loop, Código del dinero y el siguiente comando sugerido.
+          Veras Codex Loop, Codigo del dinero y el siguiente comando sugerido.
         </p>
         <div className="sentinel-glass-panel--subtle mt-4 space-y-2 px-3.5 py-2.5 text-[11px] text-muted-foreground">
           <p className="text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
@@ -567,13 +567,13 @@ function EmptyState() {
               Dock <span className="text-foreground/75">Comando</span>: crear / mover / foco / tiempo
             </li>
             <li>
-              Dock <span className="text-foreground/75">Analizar</span>: pegar texto → acciones en el resultado
+              Dock <span className="text-foreground/75">Analizar</span>: pega texto → acciones en el resultado
             </li>
             <li>
               Vista <span className="text-foreground/75">Backlog / Timeline</span>: abrir tarjetas desde el registro
             </li>
             <li>
-              Sidebar <span className="text-foreground/75">Proyectos</span>: filtrar board y ver resumen aquí
+              Sidebar <span className="text-foreground/75">Proyectos</span>: filtrar board y ver resumen aqui
             </li>
           </ul>
         </div>
@@ -766,7 +766,7 @@ export function RightPanel() {
           <div>
             <h2 className="sentinel-product-title pr-1">{card.title}</h2>
             <p className="sentinel-rail-meta mt-2 text-[11px]">
-              Tip: usá{" "}
+              Tip: usa{" "}
               <kbd className="rounded-md border border-border/35 bg-muted/80 px-1 py-px font-mono text-[10px] text-foreground/80">
                 Enter
               </kbd>{" "}

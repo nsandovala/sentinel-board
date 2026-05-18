@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,27 @@ const PRIORITIES: PriorityLevel[] = ["low", "medium", "high", "critical"];
 interface CreateTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultProjectId?: string | null;
 }
 
-export function CreateTaskModal({ open, onOpenChange }: CreateTaskModalProps) {
+export function CreateTaskModal({
+  open,
+  onOpenChange,
+  defaultProjectId,
+}: CreateTaskModalProps) {
   const { projects } = useSentinel();
   const dispatch = useSentinelDispatch();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
+  const [projectId, setProjectId] = useState(defaultProjectId ?? projects[0]?.id ?? "");
   const [type, setType] = useState<CardType>("task");
   const [priority, setPriority] = useState<PriorityLevel>("medium");
   const effectiveProjectId = projectId || projects[0]?.id || "";
+
+  useEffect(() => {
+    if (!open) return;
+    setProjectId(defaultProjectId ?? projects[0]?.id ?? "");
+  }, [defaultProjectId, open, projects]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {

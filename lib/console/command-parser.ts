@@ -253,7 +253,7 @@ function detectAnalyzeWrongTab(trimmed: string): ParseCommandLineResult | null {
     intent: "analyze",
     readyToExecute: false,
     helpLines: [
-      "Parece análisis de texto: usá la pestaña «Analizar» y pega el contexto ahí (análisis local, sin LLM).",
+      "Parece análisis de texto: usa la pestaña «Analizar» y pega el contexto ahí (análisis local, sin LLM).",
       "En «Comando» van órdenes cortas (crear, mover, foco, registrar tiempo).",
     ],
     exampleSnippets: ["cambiar a pestaña Analizar → pegar notas → botón Analizar"],
@@ -280,7 +280,7 @@ function checkIncompleteMove(trimmed: string): ParseCommandLineResult | null {
       intent: "move_status",
       readyToExecute: false,
       helpLines: [
-        "Solo «m» es ambiguo. Si querés mover, escribí «mover», «mv» o «cambiar» seguido de la tarjeta.",
+        "Solo «m» es ambiguo. Si quieres mover, escribe «mover», «mv» o «cambiar» seguido de la tarjeta.",
       ],
       exampleSnippets: ['mover "Mi tarea" a listo'],
     };
@@ -315,7 +315,7 @@ function checkIncompleteMove(trimmed: string): ParseCommandLineResult | null {
         readyToExecute: false,
         helpLines: [
           "No veo estado destino: falta « a [estado] » (o « → [estado] »).",
-          `Revisá que exista separador antes del estado (ej. desarrollo, qa, listo).`,
+          `Revisa que exista separador antes del estado (ej. desarrollo, qa, listo).`,
         ],
         exampleSnippets: [`mover "${rest.length > 40 ? rest.slice(0, 37) + "…" : rest}" a desarrollo`],
       };
@@ -337,7 +337,7 @@ function checkIncompleteCreate(trimmed: string): ParseCommandLineResult | null {
       readyToExecute: false,
       helpLines: [
         "Falta el título de la tarea.",
-        "Opcional: « en NombreProyecto » si tenés más de un proyecto.",
+        "Opcional: « en NombreProyecto » si tienes más de un proyecto.",
       ],
       exampleSnippets: ["crear tarea Revisar métricas en Sentinel", "nueva tarea Llamar al cliente"],
     };

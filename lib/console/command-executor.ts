@@ -163,7 +163,7 @@ function hintsForIntent(intent: CommandIntent, projects: Project[]): string[] {
     case "end_focus":
       return ["terminar foco", "detener foco"];
     case "analyze":
-      return ["Usá la pestaña «Analizar» para texto largo."];
+      return ["Usa la pestaña «Analizar» para texto largo."];
     default:
       return FORMAT_CHEATSHEET.map((h) => `Ej.: ${h}`);
   }
@@ -233,11 +233,11 @@ export function executeCommandWithDispatch(
             : ["No hay tarjetas en el tablero todavía."];
         return {
           success: false,
-          message: `No encontré tarjeta para «${parsed.target}». Revisá el título completo o usá comillas si tiene varias palabras.`,
+          message: `No encontré tarjeta para «${parsed.target}». Revisa el título completo o usa comillas si tiene varias palabras.`,
           hints: [
             ...sampleBlock,
             "",
-            "Pasos: 1) Mirá el título exacto en una columna 2) Copiá o escribí una parte única 3) Luego « a [estado] »",
+            "Pasos: 1) Mira el título exacto en una columna 2) Copia o escribe una parte única 3) Luego « a [estado] »",
             ...suggestCardsForQuery(cards, targetQ),
             ...hintsForIntent("move_status", projects),
           ],
@@ -368,7 +368,7 @@ export function executeCommandWithDispatch(
         success: true,
         message: project
           ? `Foco iniciado en «${project.name}»`
-          : "Foco iniciado sin proyecto concreto (podés añadir « en … » la próxima vez).",
+          : "Foco iniciado sin proyecto concreto (puedes añadir « en … » la próxima vez).",
       };
     }
 

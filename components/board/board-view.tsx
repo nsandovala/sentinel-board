@@ -112,9 +112,9 @@ function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelC
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-6">
-      <h2 className="mb-4 text-sm font-semibold text-foreground">Timeline</h2>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Clic en una fila con tarjeta citada abre el detalle en el board.
+      <h2 className="mb-1 text-sm font-semibold text-foreground">Timeline del workspace</h2>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Historial operativo del proyecto o workspace. El dock inferior muestra solo actividad reciente.
       </p>
       <div className="flex flex-col gap-1">
         {sorted.map((ev) => {
@@ -143,7 +143,18 @@ function TimelineView({ events, cards }: { events: DockEvent[]; cards: SentinelC
               title={linked ? `Abrir «${linked.title}»` : undefined}
             >
               <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${eventColors[ev.type]}`} />
-              <span className="flex-1 whitespace-pre-wrap text-[13px] text-foreground/80">{ev.message}</span>
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <span className="rounded border border-border/35 bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                  {ev.type === "command"
+                    ? "Comando"
+                    : ev.type === "focus"
+                      ? "Foco"
+                      : ev.type === "heo_suggestion"
+                        ? "Analisis"
+                        : "Sistema"}
+                </span>
+                <span className="flex-1 whitespace-pre-wrap text-[13px] text-foreground/80">{ev.message}</span>
+              </div>
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                 {formatTime(ev.timestamp)}
               </span>

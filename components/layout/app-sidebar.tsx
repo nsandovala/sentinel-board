@@ -38,7 +38,7 @@ export function AppSidebar() {
   const backlogHighCount = highPriorityBacklogCount(cards);
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <aside className="flex min-h-0 w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       {/* Branding: reset a vista global del board */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
         <button
@@ -131,7 +131,7 @@ export function AppSidebar() {
       </div>
 
       {/* Projects */}
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 pb-1 pt-3.5">
           <p className="sentinel-rail-section-label">Proyectos</p>
           <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -139,7 +139,7 @@ export function AppSidebar() {
           </span>
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <nav className="flex flex-col gap-0.5 px-3 pb-3">
             {projects.map((project) => {
               const count = cards.filter((c) => c.projectId === project.id).length;

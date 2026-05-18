@@ -431,6 +431,7 @@ agents/                         definitions/ (YAML), prompts/ (MD), skills/
 
 ---
 
+
 ## Variables de Entorno
 
 Copiar `.env.example` a `.env.local`. Todos los valores son opcionales:

@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Terminal, Search, Filter, FileText } from "lucide-react";
+import { X, Terminal, Search, Filter, FileText, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CreateTaskModal } from "@/components/modals/create-task-modal";
 import { focusCardById } from "@/lib/board/focus-card";
 import type { SearchResponse, KnowledgeEntry, SearchCardResult } from "@/types/knowledge";
 
@@ -74,6 +75,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
   const filterPopoverRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -288,6 +290,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
       }
       // El provider escucha FOCUS_CARD_EVENT y dispatcha SET_VIEW("board") + SELECT_CARD
       // (ver lib/state/sentinel-store.tsx). Reusamos la única fuente de verdad de focus.
+      dispatch({ type: "SET_VIEW", view: "board" });
       focusCardById(cardId);
       closeSearch({ clearQuery: true, blur: true });
     },
@@ -333,7 +336,8 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
   };
 
   return (
-    <header className="sentinel-topbar flex h-12 shrink-0 items-center gap-2 border-b border-border/40 bg-background px-6">
+    <>
+      <header className="sentinel-topbar flex h-12 shrink-0 items-center gap-2 border-b border-border/40 bg-background px-6">
       <nav
         className="flex min-w-0 flex-1 items-center gap-2 text-sm"
         aria-label="Ubicacion en el workspace"
@@ -388,9 +392,9 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
               if (hasActiveSearch || searching) setSearchOpen(true);
             }}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Buscar tareas y documentacion..."
+            placeholder="Buscar tareas y documentacion del workspace..."
             className="h-8 rounded-lg border-border/40 bg-muted/70 pl-8 pr-8 text-[13px]"
-            aria-label="Buscar tareas y documentacion"
+            aria-label="Buscar tareas y documentacion del workspace"
             aria-autocomplete="list"
             aria-expanded={searchOpen && (hasActiveSearch || searching)}
             aria-controls="sentinel-search-popover"
@@ -571,13 +575,13 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
-                    Search Filters
+                    Filtros
                   </p>
                   <h3 className="mt-1 text-[13px] font-semibold tracking-[-0.02em] text-foreground">
-                    Backend-first filters
+                    Filtros del workspace
                   </h3>
                   <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                    Se aplican al cambiar sin salir del board.
+                    Se aplican al instante sin salir del board.
                   </p>
                 </div>
                 <button
@@ -595,7 +599,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
 
               {selectedProjectId && (
                 <div className="mb-3 rounded-xl border border-border/35 bg-black/15 px-2.5 py-2 text-[11px] text-muted-foreground">
-                  Scope actual: <span className="font-medium text-foreground/90">{project?.name ?? selectedProjectId}</span>
+                  Proyecto activo: <span className="font-medium text-foreground/90">{project?.name ?? selectedProjectId}</span>
                 </div>
               )}
 
@@ -713,33 +717,39 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
             type="button"
             onClick={onToggleTerminal}
             className={cn(
-              "flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border/40 transition-colors",
+              "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/40 px-2.5 text-[12px] font-medium transition-colors",
               showTerminal
                 ? "bg-primary/15 text-foreground ring-1 ring-primary/25"
-                : "bg-muted text-foreground/60 hover:bg-muted/90 hover:text-foreground",
+                : "bg-muted text-foreground/70 hover:bg-muted/90 hover:text-foreground",
             )}
-            title={showTerminal ? "Ocultar HEO Copilot" : "HEO Copilot"}
+            title={showTerminal ? "Ocultar terminal local" : "Abrir terminal local"}
+            aria-label={showTerminal ? "Ocultar terminal local" : "Abrir terminal local"}
           >
             <Terminal className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Terminal</span>
           </button>
         )}
 
-        <div className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border/40 bg-muted text-foreground/80 transition-colors hover:bg-muted/90 hover:text-foreground">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 5v14" />
-            <path d="M5 12h14" />
-          </svg>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setCreateTaskOpen(true)}
+          className="h-8 gap-1.5 border-border/45 bg-card px-2.5 text-[12px] text-foreground/85 hover:bg-muted/80"
+          title="Crear una nueva tarea en el board"
+          aria-label="Crear una nueva tarea en el board"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Nueva tarea</span>
+        </Button>
       </div>
     </header>
+
+      <CreateTaskModal
+        open={createTaskOpen}
+        onOpenChange={setCreateTaskOpen}
+        defaultProjectId={selectedProjectId}
+      />
+    </>
   );
 }
