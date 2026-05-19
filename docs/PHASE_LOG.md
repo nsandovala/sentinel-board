@@ -215,3 +215,78 @@ de la ventana.
 - Atajo global Cmd+K / `/` para enfocar el `CopilotInput`
 - Cap de altura sensible al alto del TopBar + Terminal abiertos
 - Accesibilidad por teclado del resize handle
+
+---
+
+## Fase 4 — Runtime real mínimo (NDJSON polling)
+
+**Cierre:** 2026-05-19
+
+### Objetivo
+
+Conectar el modo RUNTIME a eventos reales mínimos de AMON Agents mediante
+lectura NDJSON + polling simple, sin streaming complejo.
+
+### Problema resuelto
+
+- RUNTIME mostraba lista estática `idle` permanente sin reflejar nada real
+- No había manera de saber, desde Sentinel Board, si un agente estaba
+  corriendo, terminó o falló
+- No existía contrato mínimo de lectura entre AA y SB
+
+### Cambios funcionales
+
+- **Nuevo endpoint** `app/api/runtime/events/route.ts`:
+  - Lee NDJSON desde `AMON_EVENTS_PATH`. Fallback:
+    `../amon-agents/outputs/events.jsonl` relativo al cwd.
+  - Tail eficiente: stat + read solo los últimos ~64–512 KB del archivo,
+    descarta la línea parcial inicial, parsea de atrás hacia adelante.
+  - Query `?limit=N` validado (1..200, default 100).
+  - Líneas inválidas se ignoran sin romper el endpoint.
+  - Respuesta uniforme:
+    `{ ok, source: "ndjson", exists, events, agents }`.
+  - Si el archivo no existe → `exists: false`, sin 500.
+  - En error real (no ENOENT) → 500 con mensaje genérico
+    (basename / "configured path", nunca path absoluto).
+  - Protegido por `rejectIfUnauthorized` (loopback ok, sino requiere token).
+- **Derivación de estado por agente** (`planner`, `state-guardian`,
+  `qa-reviewer`, `scorer`):
+  - `agent.started → running`
+  - `agent.done → success`
+  - `agent.error → error`
+  - Sin evento → `idle`
+  - Se conserva último mensaje, `runId`, `taskId` y `ts` por agente.
+- **`agents-mode.tsx`** reescrito:
+  - Polling cada 3000 ms con `AbortController` (cancela en unmount y en cada
+    nuevo ciclo).
+  - Renderiza estado, último mensaje, tiempo relativo, `runId/taskId`.
+  - Badge "Event Stream conectado" / "Event Stream pendiente" según `exists`.
+  - Tick interno cada 1 s para refrescar el label relativo sin re-fetchear.
+- **`.env.example`**: documentado `AMON_EVENTS_PATH` con ejemplo Windows.
+
+### Archivos modificados / creados
+
+- **Nuevo** `app/api/runtime/events/route.ts`
+- `components/console/dock/agents-mode.tsx` (reescrito)
+- `.env.example`
+- `.env.local` (configuración local: `AMON_EVENTS_PATH`)
+- `docs/ROADMAP.md`
+- `docs/OPERATIONAL_COCKPIT.md`
+
+### Resultado funcional
+
+Cuando AMON Agents emite eventos al NDJSON configurado, el modo RUNTIME del
+dock muestra el estado real de cada agente en menos de 3 s. Si el archivo
+no existe, el dock lo declara explícitamente y no inventa actividad.
+
+### Validación
+
+- `npx tsc --noEmit` → OK
+- `npm run build` → OK
+
+### Pendientes que pasan a Fase 5
+
+- WebSocket / SSE real al RUNTIME (reemplazar polling)
+- Contrato formal `RuntimeEvent` documentado (event-contract.md)
+- Render de eventos generales (`run.started`, `run.done`, `sb.push.done`)
+  en una línea de actividad del runtime, separada del Timeline

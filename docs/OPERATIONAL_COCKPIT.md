@@ -1,7 +1,7 @@
 # Operational Cockpit — HEO Copilot
 
 > Documento de arquitectura UX y conceptual del dock inferior de Sentinel Board.
-> Estado: vigente al cierre de Fase 3 (2026-05).
+> Estado: vigente al cierre de Fase 4 (2026-05).
 
 ## 1. ¿Qué es HEO Copilot?
 
@@ -78,14 +78,21 @@ El dock tiene cuatro modos seleccionables vía tabs. El input es **único**
 
 ### 3.4 RUNTIME
 
-- **Placeholder:** `Runtime se conectará al Event Stream de AMON Agents en una fase posterior.`
+- **Placeholder:** `Runtime aún no recibe comandos. Solo muestra estado de agentes.`
 - **Input:** _deshabilitado_ por diseño.
-- **Pipeline:** ninguno todavía.
+- **Pipeline (Fase 4):** polling NDJSON simple cada 3000 ms a
+  `GET /api/runtime/events` (lee `AMON_EVENTS_PATH`). No WebSocket, no SSE.
 - **Hace:**
-  - Listar agentes esperados: `planner`, `state-guardian`, `qa-reviewer`, `scorer`
-  - Todos en `idle` permanente — el dot y el label son intencionalmente estáticos
-- **No hace:** ciclar estados con clicks, mostrar timestamps falsos, sugerir
-  que hay un stream conectado.
+  - Listar agentes: `planner`, `state-guardian`, `qa-reviewer`, `scorer`.
+  - Estado por agente derivado de los últimos eventos:
+    `agent.started → running`, `agent.done → success`, `agent.error → error`,
+    sin evento reciente → `idle`.
+  - Muestra último mensaje, tiempo relativo, `runId` y `taskId` si existen.
+  - Badge "Event Stream conectado" cuando el archivo existe;
+    "Event Stream pendiente" si no.
+- **No hace:** ejecutar agentes desde SB, persistir eventos en DB,
+  reconectarse vía streaming (Fase 5+), inventar timestamps cuando no hay
+  archivo.
 
 ## 4. Status del Copilot
 
@@ -109,12 +116,14 @@ historial completo vive en el Timeline.
 > contadores que parecen reales degrada la confianza del usuario en todo lo
 > demás del producto.
 
-Hasta que exista un Event Stream real (Fase 4), Runtime se mantiene:
+Desde Fase 4, Runtime lee NDJSON real:
 
-- Lista estática con `idle`
-- Sin ciclado mock
-- Mensaje explícito de qué falta ("Event Stream de AMON Agents se conectará
-  en una fase posterior.")
+- Si no hay archivo configurado o accesible → badge "Event Stream pendiente"
+  y todos los agentes quedan en `idle`. No se inventa actividad.
+- Si hay archivo, los estados (`running / success / error`) se derivan de
+  eventos reales, no de mocks.
+- El tiempo relativo (`hace 12s`) usa el `ts` del evento, no `Date.now()`
+  inventado.
 
 Es preferible un panel honestamente vacío que un panel que aparente vida.
 
@@ -183,8 +192,9 @@ Tono general:
 Para evitar promesas implícitas, este es el muro de "todavía no":
 
 - No hay autenticación ni separación por workspace (Fase 7)
-- No hay WebSocket/SSE — el Runtime es estático (Fase 4–5)
-- No hay integración real con AMON Agents (Fase 6)
+- No hay WebSocket/SSE — el Runtime usa polling NDJSON simple cada 3 s
+  (Fase 4 implementada; streaming queda para Fase 5)
+- SB no ejecuta agentes — solo observa eventos NDJSON (Fase 6)
 - No hay tracking de tokens ni costos (Fase 8)
 - No hay entrada por voz (Fase 9)
 - No hay atajo global de teclado para enfocar el input

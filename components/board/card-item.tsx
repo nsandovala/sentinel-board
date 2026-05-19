@@ -220,7 +220,7 @@ export function CardItem({ card }: CardItemProps) {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirmDelete) {
       setConfirmDelete(true);
@@ -229,10 +229,8 @@ export function CardItem({ card }: CardItemProps) {
     }
     setDeleting(true);
     try {
-      const res = await fetch(`/api/tasks/${card.id}`, { method: "DELETE" });
-      if (res.ok) {
-        dispatch({ type: "DELETE_CARD", cardId: card.id });
-      }
+      // Store middleware now owns persistence (PATCH/DELETE) and resyncs from DB on failure.
+      dispatch({ type: "DELETE_CARD", cardId: card.id });
     } finally {
       setDeleting(false);
       setConfirmDelete(false);

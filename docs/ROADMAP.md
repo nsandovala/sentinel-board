@@ -11,7 +11,7 @@
 
 No marcar como "implementado" nada que no esté en `main` y compilando.
 
-## Implementado (Fase 1 → Fase 3)
+## Implementado (Fase 1 → Fase 4)
 
 Resumen breve — el detalle vive en `PHASE_LOG.md`.
 
@@ -24,37 +24,51 @@ Resumen breve — el detalle vive en `PHASE_LOG.md`.
 - **Fase 3 — Dock dev-first profesional:** resize con cap 65 vh, persistencia
   de altura, colapso compacto, sidebar con scroll independiente, Focus
   contextual, Dev Matte.
+- **Fase 4 — Runtime real mínimo (NDJSON polling):** endpoint
+  `GET /api/runtime/events` que hace tail de un archivo NDJSON configurado
+  vía `AMON_EVENTS_PATH`, modo RUNTIME del dock con polling cada 3 s,
+  estado real por agente (`idle/running/success/error`), badge
+  "Event Stream conectado/pendiente". Solo lectura — SB no ejecuta agentes.
 
 ---
 
 ## Fase 4 — Runtime real mínimo
 
-**Estado:** Pendiente.
+**Estado:** Implementado (2026-05-19).
 
-**Objetivo:** Que Runtime deje de ser estático y refleje actividad real,
-aunque sea con polling simple.
+**Objetivo cumplido:** Runtime dejó de ser estático. Refleja actividad real
+de AMON Agents mediante polling NDJSON simple, sin streaming complejo.
 
-**Alcance:**
+**Alcance entregado:**
 
-- Leer eventos NDJSON producidos por AMON Agents (formato a confirmar con AA).
-- Endpoint local minimal `GET /api/runtime/events` que retorne los últimos
-  N eventos en memoria o archivo, sin estado distribuido.
-- Polling desde el componente Runtime (intervalo razonable, p.ej. 3-5 s) con
-  cancelación al cambiar de modo o desmontar.
-- Indicador visual real cuando un agente pasa a `running` y vuelve a `idle`.
-- Manejo defensivo de payloads desconocidos: si llega un evento sin schema
-  esperado, se ignora silenciosamente (no romper la UI).
+- Endpoint `GET /api/runtime/events`:
+  - Lee NDJSON desde `AMON_EVENTS_PATH` (env). Fallback:
+    `../amon-agents/outputs/events.jsonl` relativo a `cwd`.
+  - Tail eficiente: lee solo el final del archivo (hasta 512 KB), descarta
+    la línea parcial inicial, parsea de atrás hacia adelante.
+  - `limit` configurable (1..200, default 100), validado en server.
+  - Líneas inválidas se ignoran sin romper la respuesta.
+  - Respuesta uniforme `{ ok, source: "ndjson", exists, events, agents }`.
+  - No expone path absoluto al cliente en error (usa basename o
+    `"configured path"`).
+- Modo RUNTIME del dock:
+  - Polling cada 3000 ms con cancelación por `AbortController`.
+  - Estado real por agente (`planner`, `state-guardian`, `qa-reviewer`,
+    `scorer`): `idle / running / success / error` derivado de los tipos
+    `agent.started / agent.done / agent.error`.
+  - Muestra último mensaje, tiempo relativo, `runId` y `taskId` si existen.
+  - Badge "Event Stream conectado" / "Event Stream pendiente" según
+    `exists` del endpoint.
+- Eventos de runtime no se persisten en DB. Eventos generales (`run.started`,
+  `run.done`, `sb.push.done`) están normalizados en la respuesta para uso
+  futuro pero no se renderizan aún en el dock.
 
-**Fuera de alcance:**
+**Fuera de alcance (sigue así):**
 
 - WebSocket / SSE (queda para Fase 5).
 - Persistencia en DB de los eventos del runtime.
-- Replay histórico — solo "lo que está pasando ahora".
-
-**Criterio de éxito:**
-
-Cuando un usuario lance una tarea desde AMON Agents y abra Runtime, ve los
-nombres correctos pasando a `running` y luego volviendo a `idle`, sin mocks.
+- Ejecución de agentes desde Sentinel Board.
+- Replay histórico — solo "lo último que está pasando".
 
 ---
 

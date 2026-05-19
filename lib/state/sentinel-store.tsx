@@ -113,40 +113,50 @@ async function hydrateFromDB(
   }
 }
 
-function persistMoveCard(cardId: string, status: CardStatus) {
-  fetch(`/api/tasks/${cardId}`, {
+async function persistFetch(input: RequestInfo, init?: RequestInit): Promise<void> {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+}
+
+function persistMoveCard(cardId: string, status: CardStatus): Promise<void> {
+  return persistFetch(`/api/tasks/${cardId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
-  }).catch(() => {});
+  });
 }
 
-function persistCreateCard(card: SentinelCard) {
-  fetch("/api/tasks", {
+function persistCreateCard(card: SentinelCard): Promise<void> {
+  return persistFetch("/api/tasks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(card),
-  }).catch(() => {});
+  });
 }
 
-function persistDeleteCard(cardId: string) {
-  fetch(`/api/tasks/${cardId}`, { method: "DELETE" }).catch(() => {});
+function persistDeleteCard(cardId: string): Promise<void> {
+  return persistFetch(`/api/tasks/${cardId}`, { method: "DELETE" });
 }
 
-function persistUpdateCard(cardId: string, updates: Partial<Omit<SentinelCard, "id">>) {
-  fetch(`/api/tasks/${cardId}`, {
+function persistUpdateCard(
+  cardId: string,
+  updates: Partial<Omit<SentinelCard, "id">>,
+): Promise<void> {
+  return persistFetch(`/api/tasks/${cardId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
-  }).catch(() => {});
+  });
 }
 
-function persistComment(comment: CardComment) {
-  fetch(`/api/tasks/${comment.cardId}/comments`, {
+function persistComment(comment: CardComment): Promise<void> {
+  return persistFetch(`/api/tasks/${comment.cardId}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(comment),
-  }).catch(() => {});
+  });
 }
 
 function persistFocusAction(
@@ -181,29 +191,45 @@ async function loadCardComments(
 export function SentinelProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(sentinelReducer, initialState);
   const stateRef = useRef(state);
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  const resyncOnFailure = useCallback((label: string, err: unknown) => {
+    console.warn(`[sentinel] ${label} failed; resyncing from DB`, err);
+    refreshRef.current();
+  }, []);
 
   const dispatch: Dispatch<SentinelAction> = useCallback(
     (action: SentinelAction) => {
       rawDispatch(action);
 
       if (action.type === "MOVE_CARD") {
-        persistMoveCard(action.cardId, action.status);
+        persistMoveCard(action.cardId, action.status).catch((e) =>
+          resyncOnFailure("move card", e),
+        );
       }
       if (action.type === "CREATE_CARD") {
-        persistCreateCard(action.card);
+        persistCreateCard(action.card).catch((e) =>
+          resyncOnFailure("create card", e),
+        );
       }
       if (action.type === "DELETE_CARD") {
-        persistDeleteCard(action.cardId);
+        persistDeleteCard(action.cardId).catch((e) =>
+          resyncOnFailure("delete card", e),
+        );
       }
       if (action.type === "UPDATE_CARD") {
-        persistUpdateCard(action.cardId, action.updates);
+        persistUpdateCard(action.cardId, action.updates).catch((e) =>
+          resyncOnFailure("update card", e),
+        );
       }
       if (action.type === "ADD_COMMENT") {
-        persistComment(action.comment);
+        persistComment(action.comment).catch((e) =>
+          resyncOnFailure("add comment", e),
+        );
       }
       if (action.type === "START_FOCUS") {
         persistFocusAction("start", action.project);
@@ -215,7 +241,7 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
         loadCardComments(action.cardId, rawDispatch);
       }
     },
-    [],
+    [resyncOnFailure],
   );
 
   const refresh = useCallback(() => {
@@ -227,6 +253,10 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
       tagFilter: stateRef.current.tagFilter,
     });
   }, []);
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
 
   useEffect(() => {
     refresh();
