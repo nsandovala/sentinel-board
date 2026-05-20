@@ -15,6 +15,13 @@
       "when": 1777441112652,
       "tag": "0001_lively_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779239766148,
+      "tag": "0002_pretty_toad",
+      "breakpoints": true
     }
   ]
 }

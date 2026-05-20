@@ -169,3 +169,41 @@ export function flattenZodIssues(error: z.ZodError): string {
     })
     .join("; ");
 }
+
+// ── GET /api/tasks query params ────────────────────────────────────────────
+// Express boolean coercion that tolerates the strings the frontend may send
+// (true/false/1/0) and rejects anything else.
+const booleanQuery = z
+  .union([z.literal("true"), z.literal("false"), z.literal("1"), z.literal("0")])
+  .transform((v) => v === "true" || v === "1");
+
+const intQuery = (min: number, max: number, fallback: number) =>
+  z
+    .string()
+    .regex(/^\d+$/, "must be a non-negative integer")
+    .transform((s) => Number.parseInt(s, 10))
+    .pipe(z.number().int().min(min).max(max))
+    .or(z.undefined())
+    .transform((n) => (n === undefined ? fallback : n));
+
+export const getTasksQuerySchema = z
+  .object({
+    q: z.string().min(1).max(200).optional(),
+    projectId: z.string().min(1).max(200).optional(),
+    status: cardStatusEnum.optional(),
+    priority: priorityEnum.optional(),
+    type: cardTypeEnum.optional(),
+    tag: z.string().min(1).max(80).optional(),
+    blocked: booleanQuery.optional(),
+    limit: intQuery(1, 200, 200),
+    offset: intQuery(0, 100_000, 0),
+  })
+  .strict();
+
+export type GetTasksQuery = z.infer<typeof getTasksQuerySchema>;
+
+// Escape Postgres ILIKE wildcards so user input like "50%" does not match
+// every row that contains "50".
+export function escapeLikePattern(input: string): string {
+  return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}

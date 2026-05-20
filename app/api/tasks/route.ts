@@ -1,61 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { tasks, taskChecklistItems, events } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { z } from "zod";
 import { syncBus } from "@/lib/server/sync-bus";
+import { assembleCard } from "@/lib/server/assemble-card";
+import {
+  getTasksQuerySchema,
+  escapeLikePattern,
+  flattenZodIssues,
+} from "@/lib/validation/tasks";
 import type { SentinelCard } from "@/types/card";
 
 export const dynamic = "force-dynamic";
 
-function assembleCard(
-  row: typeof tasks.$inferSelect,
-  checklist: (typeof taskChecklistItems.$inferSelect)[],
-): SentinelCard {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description ?? undefined,
-    status: row.status as SentinelCard["status"],
-    type: row.type as SentinelCard["type"],
-    priority: row.priority as SentinelCard["priority"],
-    tags: (row.tags ?? []) as string[],
-    projectId: row.projectId,
-    checklist: checklist
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((ci) => ({
-        id: ci.id,
-        text: ci.text,
-        status: ci.status as SentinelCard["checklist"][number]["status"],
-      })),
-    codexLoop: (row.codexLoop as SentinelCard["codexLoop"]) ?? undefined,
-    fiveWhys: (row.fiveWhys as SentinelCard["fiveWhys"]) ?? undefined,
-    moneyCode: (row.moneyCode as unknown as SentinelCard["moneyCode"]) ?? undefined,
-    blocked: row.blocked,
-    blockerReason: row.blockerReason ?? undefined,
-    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
-  };
-}
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const allTasks = await db.select().from(tasks);
-    const allChecklist = await db.select().from(taskChecklistItems);
+    const rawQuery = Object.fromEntries(req.nextUrl.searchParams.entries());
 
-    const checklistByTask = new Map<string, (typeof taskChecklistItems.$inferSelect)[]>();
-    for (const ci of allChecklist) {
-      const arr = checklistByTask.get(ci.taskId) ?? [];
-      arr.push(ci);
-      checklistByTask.set(ci.taskId, arr);
+    let query;
+    try {
+      query = getTasksQuerySchema.parse(rawQuery);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return NextResponse.json(
+          { ok: false, error: `Invalid query: ${flattenZodIssues(err)}` },
+          { status: 400 },
+        );
+      }
+      throw err;
     }
 
-    const cards: SentinelCard[] = allTasks.map((t) =>
-      assembleCard(t, checklistByTask.get(t.id) ?? []),
+    const conditions: SQL[] = [];
+    if (query.projectId) conditions.push(eq(tasks.projectId, query.projectId));
+    if (query.status) conditions.push(eq(tasks.status, query.status));
+    if (query.priority) conditions.push(eq(tasks.priority, query.priority));
+    if (query.type) conditions.push(eq(tasks.type, query.type));
+    if (query.blocked !== undefined) conditions.push(eq(tasks.blocked, query.blocked));
+
+    if (query.q) {
+      const pattern = `%${escapeLikePattern(query.q)}%`;
+      const titleMatch = ilike(tasks.title, pattern);
+      const descriptionMatch = ilike(tasks.description, pattern);
+      const combined = or(titleMatch, descriptionMatch);
+      if (combined) conditions.push(combined);
+    }
+
+    if (query.tag) {
+      // jsonb containment: tags @> '["frontend"]'::jsonb — uses GIN index if present.
+      conditions.push(
+        sql`${tasks.tags} @> ${JSON.stringify([query.tag])}::jsonb`,
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const taskRows = await db
+      .select()
+      .from(tasks)
+      .where(where)
+      .orderBy(desc(tasks.updatedAt), desc(tasks.createdAt))
+      .limit(query.limit)
+      .offset(query.offset);
+
+    let checklistByTask = new Map<string, (typeof taskChecklistItems.$inferSelect)[]>();
+    if (taskRows.length > 0) {
+      const taskIds = taskRows.map((row) => row.id);
+      const checklistRows = await db
+        .select()
+        .from(taskChecklistItems)
+        .where(inArray(taskChecklistItems.taskId, taskIds));
+
+      checklistByTask = new Map();
+      for (const ci of checklistRows) {
+        const arr = checklistByTask.get(ci.taskId) ?? [];
+        arr.push(ci);
+        checklistByTask.set(ci.taskId, arr);
+      }
+    }
+
+    const cards: SentinelCard[] = taskRows.map((row) =>
+      assembleCard(row, checklistByTask.get(row.id) ?? []),
     );
 
     return NextResponse.json({ ok: true, tasks: cards });
   } catch (err) {
+    console.error("[GET /api/tasks]", err);
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "DB read error" },
+      { ok: false, error: "Internal error" },
       { status: 500 },
     );
   }

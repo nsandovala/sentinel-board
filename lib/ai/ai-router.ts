@@ -4,7 +4,14 @@
  * Each provider follows its native API format.
  * Ollama/OpenRouter use OpenAI-compatible chat completions.
  * Anthropic uses its Messages API.
+ *
+ * Model identifiers are validated against `lib/ai/models.ts` BEFORE any HTTP
+ * call. An invalid model never reaches the network — the provider is skipped
+ * with a clear error and a single console warning so misconfiguration shows
+ * up loudly instead of silently.
  */
+
+import { validateModel, type ProviderName } from "./models";
 
 export type AIProviderName = "ollama" | "openrouter" | "anthropic" | "heuristic";
 
@@ -22,8 +29,20 @@ interface ChatMessage {
 
 interface ProviderConfig {
   name: AIProviderName;
+  /** True only if env is set AND the configured model id is valid. */
   available: () => boolean;
+  /** Status snapshot used by describeProviders() for diagnostics. */
+  describe: () => ProviderStatus;
   call: (messages: ChatMessage[]) => Promise<AIRouterResult>;
+}
+
+export interface ProviderStatus {
+  provider: AIProviderName;
+  configured: boolean;
+  model: string;
+  modelValid: boolean;
+  modelError?: string;
+  available: boolean;
 }
 
 function getEnv(key: string, fallback: string): string {
@@ -40,9 +59,43 @@ function extractContent(json: Record<string, unknown>): string {
   return "";
 }
 
+// One warning per (provider, model) per process — avoids log spam when the
+// router is called on every dock submit.
+const warnedKeys = new Set<string>();
+function warnOnce(key: string, message: string): void {
+  if (warnedKeys.has(key)) return;
+  warnedKeys.add(key);
+  console.warn(`[ai-router] ${message}`);
+}
+
+function rejectInvalidModel(
+  provider: AIProviderName,
+  reason: string,
+): AIRouterResult {
+  return {
+    ok: false,
+    provider,
+    rawText: "",
+    error: `Invalid ${provider} model configured: ${reason}`,
+  };
+}
+
+// ── Ollama ─────────────────────────────────────────────────────────────────
+const OLLAMA_DEFAULT_MODEL = "qwen3:8b";
+
+function ollamaModel(): string {
+  return getEnv("OLLAMA_MODEL", OLLAMA_DEFAULT_MODEL);
+}
+
 async function callOllama(messages: ChatMessage[]): Promise<AIRouterResult> {
   const base = getEnv("OLLAMA_BASE_URL", "http://localhost:11434");
-  const model = getEnv("OLLAMA_MODEL", "qwen3:8b");
+  const model = ollamaModel();
+
+  const check = validateModel("ollama", model);
+  if (!check.valid) {
+    warnOnce(`ollama:${model}`, check.reason ?? "invalid Ollama model");
+    return rejectInvalidModel("ollama", check.reason ?? "invalid model");
+  }
 
   const res = await fetch(`${base}/api/chat`, {
     method: "POST",
@@ -65,9 +118,22 @@ async function callOllama(messages: ChatMessage[]): Promise<AIRouterResult> {
   return { ok: true, provider: "ollama", rawText };
 }
 
+// ── OpenRouter ─────────────────────────────────────────────────────────────
+const OPENROUTER_DEFAULT_MODEL = "qwen/qwen3-8b:free";
+
+function openRouterModel(): string {
+  return getEnv("OPENROUTER_MODEL", OPENROUTER_DEFAULT_MODEL);
+}
+
 async function callOpenRouter(messages: ChatMessage[]): Promise<AIRouterResult> {
   const key = getEnv("OPENROUTER_API_KEY", "");
-  const model = getEnv("OPENROUTER_MODEL", "qwen/qwen3-8b:free");
+  const model = openRouterModel();
+
+  const check = validateModel("openrouter", model);
+  if (!check.valid) {
+    warnOnce(`openrouter:${model}`, check.reason ?? "invalid OpenRouter model");
+    return rejectInvalidModel("openrouter", check.reason ?? "invalid model");
+  }
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -99,9 +165,22 @@ async function callOpenRouter(messages: ChatMessage[]): Promise<AIRouterResult> 
   return { ok: true, provider: "openrouter", rawText };
 }
 
+// ── Anthropic ──────────────────────────────────────────────────────────────
+const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+
+function anthropicModel(): string {
+  return getEnv("ANTHROPIC_MODEL", ANTHROPIC_DEFAULT_MODEL);
+}
+
 async function callAnthropic(messages: ChatMessage[]): Promise<AIRouterResult> {
   const key = getEnv("ANTHROPIC_API_KEY", "");
-  const model = getEnv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001");
+  const model = anthropicModel();
+
+  const check = validateModel("anthropic", model);
+  if (!check.valid) {
+    warnOnce(`anthropic:${model}`, check.reason ?? "invalid Anthropic model");
+    return rejectInvalidModel("anthropic", check.reason ?? "invalid model");
+  }
 
   const systemMessage = messages.find((m) => m.role === "system");
   const userMessages = messages
@@ -147,28 +226,71 @@ async function callAnthropic(messages: ChatMessage[]): Promise<AIRouterResult> {
   return { ok: true, provider: "anthropic", rawText };
 }
 
+// ── Provider registry ──────────────────────────────────────────────────────
+function describeProvider(
+  name: AIProviderName,
+  envKey: string | null,
+  providerKey: ProviderName,
+  model: string,
+): ProviderStatus {
+  const configured = envKey === null ? true : getEnv(envKey, "").trim().length > 0;
+  const check = validateModel(providerKey, model);
+  return {
+    provider: name,
+    configured,
+    model,
+    modelValid: check.valid,
+    modelError: check.reason,
+    available: configured && check.valid,
+  };
+}
+
 const providers: ProviderConfig[] = [
   {
     name: "ollama",
-    available: () => true,
+    available: () => describeProvider("ollama", null, "ollama", ollamaModel()).available,
+    describe: () => describeProvider("ollama", null, "ollama", ollamaModel()),
     call: callOllama,
   },
   {
     name: "openrouter",
-    available: () => getEnv("OPENROUTER_API_KEY", "").length > 0,
+    available: () =>
+      describeProvider("openrouter", "OPENROUTER_API_KEY", "openrouter", openRouterModel())
+        .available,
+    describe: () =>
+      describeProvider("openrouter", "OPENROUTER_API_KEY", "openrouter", openRouterModel()),
     call: callOpenRouter,
   },
   {
     name: "anthropic",
-    available: () => getEnv("ANTHROPIC_API_KEY", "").length > 0,
+    available: () =>
+      describeProvider("anthropic", "ANTHROPIC_API_KEY", "anthropic", anthropicModel())
+        .available,
+    describe: () =>
+      describeProvider("anthropic", "ANTHROPIC_API_KEY", "anthropic", anthropicModel()),
     call: callAnthropic,
   },
 ];
 
 /**
+ * Snapshot of every provider's effective state — used by future doctor /
+ * status endpoints and by `routeAI` itself to skip misconfigured providers.
+ *
+ * Each entry carries:
+ *   - `configured`: required env vars are present
+ *   - `modelValid`: configured model id passes lib/ai/models.ts validation
+ *   - `available`: both of the above (healthy enough to attempt a call)
+ *   - `modelError`: human-readable reason when modelValid is false
+ */
+export function describeProviders(): ProviderStatus[] {
+  return providers.map((p) => p.describe());
+}
+
+/**
  * Routes a chat completion through available providers in priority order.
- * Returns the first successful result, or an error from the last attempt
- * so the caller knows to activate heuristic fallback.
+ * Skips providers whose env/model is invalid (a warning is logged once per
+ * process for the offending model). Returns the first successful result,
+ * or the last attempt's error so the caller can switch to heuristic fallback.
  */
 export async function routeAI(
   systemPrompt: string,
@@ -180,9 +302,24 @@ export async function routeAI(
   ];
 
   let lastError: AIRouterResult | null = null;
+  let skippedInvalid = false;
 
   for (const p of providers) {
-    if (!p.available()) continue;
+    const status = p.describe();
+    if (!status.configured) continue;
+    if (!status.modelValid) {
+      warnOnce(`skip:${status.provider}:${status.model}`,
+        `skipping ${status.provider} due to invalid model "${status.model}"`,
+      );
+      skippedInvalid = true;
+      lastError = {
+        ok: false,
+        provider: status.provider,
+        rawText: "",
+        error: status.modelError ?? `Invalid ${status.provider} model`,
+      };
+      continue;
+    }
 
     try {
       const result = await p.call(messages);
@@ -202,6 +339,8 @@ export async function routeAI(
     ok: false,
     provider: "heuristic",
     rawText: "",
-    error: "Sin proveedores disponibles",
+    error: skippedInvalid
+      ? "Todos los proveedores configurados tienen modelo inválido"
+      : "Sin proveedores disponibles",
   };
 }

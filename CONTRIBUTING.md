@@ -14,21 +14,28 @@ npm run dev
 
 ## Stack
 
-- **Next.js 16** (App Router, TypeScript strict)
-- **SQLite + Drizzle ORM** (local-first)
+- **Next.js 16** (App Router, TypeScript strict, Turbopack)
+- **PostgreSQL (Neon) + Drizzle ORM**
 - **Tailwind CSS 4** + shadcn/ui
 - **@dnd-kit** para drag & drop
+- **Zod** para validación server-side
 
 ## Estructura clave
 
 ```
-app/api/          → API routes (REST)
+app/api/          → API routes (REST). Body validado con Zod.
 components/       → React components
-lib/state/        → Reducer + Context (UI state)
-lib/db/           → Schema + queries (persistence)
-lib/ai/           → AI router (Ollama → OpenRouter → Anthropic)
+lib/state/        → Reducer + Context (UI state, resync en error de persistencia)
+lib/db/           → Schema + queries (Postgres / Neon)
+lib/ai/           → AI router (Ollama → OpenRouter → Anthropic → heurístico)
+lib/ai/models.ts  → Source of truth de modelos válidos por provider
 lib/agents/       → Agent definitions + execution
+lib/validation/   → Schemas Zod reutilizables
+lib/server/       → Helpers de server (assemble-card, request-guard, sync-bus)
 ```
+
+Antes de cambios no triviales, revisar [`AGENT.md`](AGENT.md) — son las
+reglas operacionales que aplican a humanos y agentes IA por igual.
 
 ## Convenciones
 
