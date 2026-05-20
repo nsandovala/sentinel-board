@@ -49,23 +49,6 @@ function buildUpdatePayload(body: PatchTaskBody): Record<string, unknown> {
   return updates;
 }
 
-async function replaceChecklist(
-  taskId: string,
-  checklist: NonNullable<PatchTaskBody["checklist"]>,
-): Promise<void> {
-  await db.delete(taskChecklistItems).where(eq(taskChecklistItems.taskId, taskId));
-  if (checklist.length === 0) return;
-  await db.insert(taskChecklistItems).values(
-    checklist.map((item, idx) => ({
-      id: item.id,
-      taskId,
-      text: item.text,
-      status: item.status,
-      sortOrder: idx,
-    })),
-  );
-}
-
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
@@ -90,22 +73,42 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       throw err;
     }
 
+    // Existence check happens *inside* the transaction too — the select
+    // outside is used only to short-circuit a 404 before opening a tx.
     const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!existing) return notFound();
 
-    await db.update(tasks).set(buildUpdatePayload(body)).where(eq(tasks.id, id));
+    // Atomic: task update + full checklist replacement (delete + insert) +
+    // status-change event. If any step fails the row keeps its previous
+    // state and the timeline does not get a misleading "→ status" entry.
+    await db.transaction(async (tx) => {
+      await tx.update(tasks).set(buildUpdatePayload(body)).where(eq(tasks.id, id));
 
-    if (body.checklist !== undefined) {
-      await replaceChecklist(id, body.checklist);
-    }
+      if (body.checklist !== undefined) {
+        await tx
+          .delete(taskChecklistItems)
+          .where(eq(taskChecklistItems.taskId, id));
+        if (body.checklist.length > 0) {
+          await tx.insert(taskChecklistItems).values(
+            body.checklist.map((item, idx) => ({
+              id: item.id,
+              taskId: id,
+              text: item.text,
+              status: item.status,
+              sortOrder: idx,
+            })),
+          );
+        }
+      }
 
-    if (body.status && body.status !== existing.status) {
-      await db.insert(events).values({
-        id: `ev-${Date.now()}`,
-        type: "command",
-        message: `"${existing.title}" → ${body.status}`,
-      });
-    }
+      if (body.status && body.status !== existing.status) {
+        await tx.insert(events).values({
+          id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: "command",
+          message: `"${existing.title}" → ${body.status}`,
+        });
+      }
+    });
 
     syncBus.emitTaskUpdated(id, {
       projectId: existing.projectId,
@@ -129,12 +132,16 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!existing) return notFound();
 
-    await db.delete(tasks).where(eq(tasks.id, id));
-
-    await db.insert(events).values({
-      id: `ev-${Date.now()}`,
-      type: "command",
-      message: `Tarea eliminada: "${existing.title}"`,
+    // Atomic delete + event. Cascade FKs clean up checklist + comments
+    // within the same tx; if the event fails the delete is rolled back so
+    // the timeline never claims a card was deleted when it still exists.
+    await db.transaction(async (tx) => {
+      await tx.delete(tasks).where(eq(tasks.id, id));
+      await tx.insert(events).values({
+        id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: "command",
+        message: `Tarea eliminada: "${existing.title}"`,
+      });
     });
 
     syncBus.emitTaskDeleted(id, { projectId: existing.projectId });

@@ -103,16 +103,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await db.insert(tasks)
-      .values({
-        id: body.id,
-        title: body.title,
+    // Single transaction: task + checklist + creation event. If any write
+    // fails the row is rolled back atomically — no orphan event, no card
+    // without checklist.
+    await db.transaction(async (tx) => {
+      await tx.insert(tasks).values({
+        id: body.id!,
+        title: body.title!,
         description: body.description ?? null,
         status: body.status ?? "idea_bruta",
         type: body.type ?? "task",
         priority: body.priority ?? "medium",
         tags: body.tags ?? [],
-        projectId: body.projectId,
+        projectId: body.projectId!,
         blocked: body.blocked ?? false,
         blockerReason: body.blockerReason ?? null,
         codexLoop: (body.codexLoop as Record<string, string | undefined>) ?? null,
@@ -120,27 +123,27 @@ export async function POST(req: NextRequest) {
         moneyCode: (body.moneyCode as unknown as Record<string, number | undefined>) ?? null,
       });
 
-    if (body.checklist?.length) {
-      for (let i = 0; i < body.checklist.length; i++) {
-        const item = body.checklist[i];
-        await db.insert(taskChecklistItems)
-          .values({
+      if (body.checklist?.length) {
+        await tx.insert(taskChecklistItems).values(
+          body.checklist.map((item, i) => ({
             id: item.id,
-            taskId: body.id,
+            taskId: body.id!,
             text: item.text,
             status: item.status,
             sortOrder: i,
-          });
+          })),
+        );
       }
-    }
 
-    await db.insert(events)
-      .values({
-        id: `ev-${Date.now()}`,
+      await tx.insert(events).values({
+        id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: "command",
         message: `Tarea creada: "${body.title}"`,
       });
+    });
 
+    // Post-commit side-effects: notify SSE listeners and assemble the
+    // response card. These read committed state — never inside the tx.
     syncBus.emitTaskCreated(body.id, { projectId: body.projectId });
 
     const [inserted] = await db.select().from(tasks).where(eq(tasks.id, body.id)).limit(1);
@@ -154,8 +157,9 @@ export async function POST(req: NextRequest) {
       task: inserted ? assembleCard(inserted, checklist) : null,
     });
   } catch (err) {
+    console.error("[POST /api/tasks]", err);
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "DB write error" },
+      { ok: false, error: "Internal error" },
       { status: 500 },
     );
   }

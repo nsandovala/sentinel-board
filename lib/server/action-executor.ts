@@ -120,18 +120,24 @@ async function executeMoveCard(title: string, status: string): Promise<ActionRes
   const oldLabel = STATUS_LABELS[card.status as CardStatus] ?? card.status;
   const newLabel = STATUS_LABELS[status as CardStatus] ?? status;
 
-  await db.update(tasks)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(tasks.id, card.id));
+  // Atomic: status update + timeline event. Prevents a card moving in the
+  // board without a matching timeline entry, or a timeline "→ status" that
+  // claims a transition that didn't actually commit.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(tasks)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(tasks.id, card.id));
 
-  syncBus.emitTaskUpdated(card.id, { projectId: card.projectId, status });
-
-  await db.insert(events)
-    .values({
-      id: `ev-${Date.now()}`,
+    await tx.insert(events).values({
+      id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: "command",
       message: `"${card.title}" → ${newLabel}`,
     });
+  });
+
+  // Post-commit notification: SSE bus reads committed state.
+  syncBus.emitTaskUpdated(card.id, { projectId: card.projectId, status });
 
   return {
     ok: true,
