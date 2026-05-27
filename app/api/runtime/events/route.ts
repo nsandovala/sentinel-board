@@ -1,3 +1,16 @@
+/**
+ * GET /api/runtime/events
+ *
+ * Lee `outputs/events.jsonl` de AMON Agents y devuelve:
+ *   - events:  últimas N líneas normalizadas (newest-first)
+ *   - runs:    agrupado por runId — un run por ejecución de comando (doctor /
+ *              status / audit / scan / run / push) con su estado derivado y
+ *              findings asociados (audit.finding / scan.finding).
+ *   - agents:  snapshot del pipeline `run` (planner/state-guardian/qa/scorer).
+ *
+ * Solo lectura. No ejecuta comandos, no abre shell, no abre sockets.
+ * Polling es la única integración soportada hoy.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { open, stat } from "node:fs/promises";
 import path from "node:path";
@@ -7,11 +20,13 @@ import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const DEFAULT_LIMIT = 100;
-const MAX_LIMIT = 200;
+const DEFAULT_LIMIT = 200;
+const MAX_LIMIT = 500;
 const MIN_LIMIT = 1;
-const TAIL_CHUNK_BYTES = 64 * 1024;
-const MAX_TAIL_BYTES = 512 * 1024;
+const TAIL_CHUNK_BYTES = 128 * 1024;
+const MAX_TAIL_BYTES = 1024 * 1024;
+const MAX_FINDINGS_PER_RUN = 30;
+const MAX_RUNS = 40;
 
 const TRACKED_AGENTS = [
   "planner",
@@ -22,6 +37,16 @@ const TRACKED_AGENTS = [
 
 type TrackedAgent = (typeof TRACKED_AGENTS)[number];
 type AgentState = "idle" | "running" | "success" | "error";
+export type RunState = "running" | "done" | "error" | "unknown";
+
+interface RawPayload {
+  command?: unknown;
+  repo?: unknown;
+  exitCode?: unknown;
+  category?: unknown;
+  findingId?: unknown;
+  detail?: unknown;
+}
 
 interface RawEvent {
   id?: unknown;
@@ -34,6 +59,7 @@ interface RawEvent {
   message?: unknown;
   source?: unknown;
   consumer?: unknown;
+  payload?: unknown;
 }
 
 interface NormalizedEvent {
@@ -47,6 +73,7 @@ interface NormalizedEvent {
   message: string | null;
   source: string | null;
   consumer: string | null;
+  payload: RawPayload | null;
 }
 
 interface AgentSnapshot {
@@ -57,6 +84,36 @@ interface AgentSnapshot {
   lastTs: string | null;
   runId: string | null;
   taskId: string | null;
+}
+
+interface Finding {
+  ts: string | null;
+  level: "info" | "warn" | "error";
+  message: string;
+  category: string | null;
+  findingId: string | null;
+}
+
+interface RunSnapshot {
+  runId: string;
+  command: string | null;
+  agent: string | null;
+  taskId: string | null;
+  repo: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  state: RunState;
+  level: "info" | "warn" | "error" | null;
+  lastMessage: string | null;
+  exitCode: number | null;
+  eventCount: number;
+  findings: {
+    audit: Finding[];
+    scan: Finding[];
+    auditTotal: number;
+    scanTotal: number;
+  };
+  push: { started: boolean; done: boolean; error: boolean };
 }
 
 function resolveEventsPath(): { path: string; configured: boolean } {
@@ -74,6 +131,11 @@ function asString(value: unknown): string | null {
   return null;
 }
 
+function asPayload(value: unknown): RawPayload | null {
+  if (!value || typeof value !== "object") return null;
+  return value as RawPayload;
+}
+
 function normalizeEvent(raw: RawEvent): NormalizedEvent {
   return {
     id: asString(raw.id),
@@ -86,6 +148,7 @@ function normalizeEvent(raw: RawEvent): NormalizedEvent {
     message: asString(raw.message),
     source: asString(raw.source),
     consumer: asString(raw.consumer),
+    payload: asPayload(raw.payload),
   };
 }
 
@@ -107,15 +170,20 @@ function deriveAgentState(eventType: string | null): AgentState | null {
   }
 }
 
+function clampLevel(value: string | null): "info" | "warn" | "error" {
+  if (value === "warn" || value === "error") return value;
+  return "info";
+}
+
 function buildAgentSnapshots(events: NormalizedEvent[]): AgentSnapshot[] {
+  // events arrive newest-first; first match wins per agent.
   const byAgent = new Map<TrackedAgent, AgentSnapshot>();
 
   for (const ev of events) {
     if (!isTrackedAgent(ev.agent)) continue;
     const state = deriveAgentState(ev.type);
     if (state === null) continue;
-    const prev = byAgent.get(ev.agent);
-    if (prev) continue; // first match wins (events are newest-first)
+    if (byAgent.has(ev.agent)) continue;
     byAgent.set(ev.agent, {
       agent: ev.agent,
       state,
@@ -142,6 +210,159 @@ function buildAgentSnapshots(events: NormalizedEvent[]): AgentSnapshot[] {
   });
 }
 
+function tsCompareAsc(a: string | null, b: string | null): number {
+  const av = a ? Date.parse(a) : 0;
+  const bv = b ? Date.parse(b) : 0;
+  return av - bv;
+}
+
+function ensureRun(map: Map<string, RunSnapshot>, runId: string): RunSnapshot {
+  let run = map.get(runId);
+  if (run) return run;
+  run = {
+    runId,
+    command: null,
+    agent: null,
+    taskId: null,
+    repo: null,
+    startedAt: null,
+    endedAt: null,
+    state: "unknown",
+    level: null,
+    lastMessage: null,
+    exitCode: null,
+    eventCount: 0,
+    findings: { audit: [], scan: [], auditTotal: 0, scanTotal: 0 },
+    push: { started: false, done: false, error: false },
+  };
+  map.set(runId, run);
+  return run;
+}
+
+function applyEventToRun(run: RunSnapshot, ev: NormalizedEvent): void {
+  run.eventCount += 1;
+
+  // taskId/agent/repo are sticky once observed.
+  if (!run.taskId && ev.taskId) run.taskId = ev.taskId;
+  if (!run.agent && ev.agent) run.agent = ev.agent;
+  if (!run.repo && ev.payload?.repo && typeof ev.payload.repo === "string") {
+    run.repo = ev.payload.repo;
+  }
+  if (!run.command && ev.payload?.command && typeof ev.payload.command === "string") {
+    run.command = ev.payload.command;
+  }
+  // Derive command from event type when payload didn't carry it (older lines).
+  if (!run.command) {
+    if (ev.type === "run.started" || ev.type === "run.done") run.command = "run";
+    else if (ev.type?.startsWith("sb.push.")) run.command = run.command ?? "push";
+  }
+
+  // Track latest message/ts.
+  if (ev.ts) {
+    if (!run.startedAt || tsCompareAsc(ev.ts, run.startedAt) < 0) run.startedAt = ev.ts;
+  }
+  // Always treat the most recent (by ts) as the run's surface state.
+  if (!run.endedAt || tsCompareAsc(run.endedAt, ev.ts) <= 0) {
+    run.endedAt = ev.ts;
+    run.lastMessage = ev.message;
+    run.level = clampLevel(ev.level);
+  }
+
+  // State transitions.
+  switch (ev.type) {
+    case "command.started":
+    case "agent.started":
+    case "run.started":
+    case "sb.push.started":
+      if (run.state === "unknown" || run.state === "running") {
+        run.state = "running";
+      }
+      if (ev.type === "sb.push.started") run.push.started = true;
+      break;
+    case "command.done":
+    case "run.done":
+      if (run.state !== "error") run.state = "done";
+      if (typeof ev.payload?.exitCode === "number") {
+        run.exitCode = ev.payload.exitCode;
+        if (ev.payload.exitCode !== 0) run.state = "error";
+      }
+      break;
+    case "sb.push.done":
+      run.push.done = true;
+      break;
+    case "command.error":
+    case "agent.error":
+    case "sb.push.error":
+      run.state = "error";
+      if (ev.type === "sb.push.error") run.push.error = true;
+      break;
+    case "audit.finding": {
+      run.command = run.command ?? "audit";
+      run.findings.auditTotal += 1;
+      if (run.findings.audit.length < MAX_FINDINGS_PER_RUN) {
+        run.findings.audit.push({
+          ts: ev.ts,
+          level: clampLevel(ev.level),
+          message: ev.message ?? "",
+          category: asString(ev.payload?.category) ?? null,
+          findingId: asString(ev.payload?.findingId) ?? null,
+        });
+      }
+      break;
+    }
+    case "scan.finding": {
+      run.command = run.command ?? "scan";
+      run.findings.scanTotal += 1;
+      if (run.findings.scan.length < MAX_FINDINGS_PER_RUN) {
+        run.findings.scan.push({
+          ts: ev.ts,
+          level: clampLevel(ev.level),
+          message: ev.message ?? "",
+          category: asString(ev.payload?.category) ?? null,
+          findingId: asString(ev.payload?.findingId) ?? null,
+        });
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+function buildRunSnapshots(events: NormalizedEvent[]): RunSnapshot[] {
+  // Process oldest-first so startedAt/endedAt are accurate.
+  const ordered = [...events].sort((a, b) => tsCompareAsc(a.ts, b.ts));
+  const byRun = new Map<string, RunSnapshot>();
+
+  for (const ev of ordered) {
+    if (!ev.runId) continue;
+    const run = ensureRun(byRun, ev.runId);
+    applyEventToRun(run, ev);
+  }
+
+  // Sort findings inside each run by ts asc (insertion order preserves this).
+  for (const run of byRun.values()) {
+    if (!run.command && run.agent) run.command = "run";
+
+    // AMON Agents emits two runIds per `audit`/`scan`: the CLI envelope
+    // (`command.*`) and the command-internal id that carries
+    // `audit.finding` / `scan.finding`. The child run never receives a
+    // `command.done` so it stays `unknown`. If findings exist and no error
+    // was observed, derive `done` — the work completed by definition of
+    // having emitted findings.
+    if (
+      run.state === "unknown" &&
+      (run.findings.auditTotal > 0 || run.findings.scanTotal > 0)
+    ) {
+      run.state = "done";
+    }
+  }
+
+  // Newest run on top.
+  const runs = Array.from(byRun.values()).sort((a, b) => -tsCompareAsc(a.endedAt, b.endedAt));
+  return runs.slice(0, MAX_RUNS);
+}
+
 async function tailNdjson(filePath: string, maxLines: number): Promise<NormalizedEvent[]> {
   const info = await stat(filePath);
   if (!info.isFile() || info.size === 0) return [];
@@ -159,7 +380,6 @@ async function tailNdjson(filePath: string, maxLines: number): Promise<Normalize
     await handle.read(buf, 0, targetBytes, start);
     const text = buf.toString("utf8");
 
-    // If we did not read from the beginning, drop the first (likely partial) line.
     const rawLines = text.split(/\r?\n/);
     const lines = start > 0 && rawLines.length > 1 ? rawLines.slice(1) : rawLines;
 
@@ -217,9 +437,12 @@ export async function GET(req: NextRequest) {
         {
           ok: false,
           source: "ndjson",
+          path: filePath,
+          configured,
           exists: false,
           events: [],
           agents: buildAgentSnapshots([]),
+          runs: [],
           error: `Cannot read ${pathLabel}`,
         },
         { status: 500 },
@@ -228,12 +451,16 @@ export async function GET(req: NextRequest) {
   }
 
   const agents = buildAgentSnapshots(events);
+  const runs = buildRunSnapshots(events);
 
   return NextResponse.json({
     ok: true,
     source: "ndjson",
+    path: filePath,
+    configured,
     exists,
     events,
     agents,
+    runs,
   });
 }
