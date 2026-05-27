@@ -1,18 +1,18 @@
 /**
  * action-executor.ts
  *
- * Purpose: Execute resolved terminal actions against the real DB.
+ * Purpose: Execute resolved dock/agent actions against the real DB.
  * Uses the SAME Postgres database the board reads from — no separate store.
  *
  * Input:  ResolvedAction from action-resolver.ts
- * Output: ActionResult with structured data for the terminal
+ * Output: ActionResult with structured data for the caller
  *
  * Dependency: lib/db (Drizzle + node-postgres), lib/db/schema
  *
  * Risks:
  * - Writes here bypass the React reducer. The client needs to re-hydrate
- *   or the board will be stale until next page load. For MOVE_CARD, the
- *   terminal-runner should hint the client to refresh.
+ *   or the board will be stale until next page load. For MOVE_CARD, callers
+ *   should hint the client to refresh via syncBus / SSE.
  * - Fuzzy title matching uses includes() — could match wrong card if
  *   titles are substrings of each other. Good enough for phase 1.
  */

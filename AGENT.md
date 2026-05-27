@@ -44,8 +44,7 @@ Reglas derivadas:
 | **Board** | Mostrar y mutar cards por status/project | tener filtros locales que el backend ya soporta; sortear o filtrar en memoria lo que SQL puede hacer |
 | **Timeline** | Historia operacional persistente | duplicarse en otros paneles; convertirse en un log mutable |
 | **Detail Panel** | Contexto y comentarios de UNA card seleccionada | romper la regla single-card (no multi-select) |
-| **HEO Copilot Dock** | Acciones en curso (Execute/Analyze/Focus/Runtime) | acumular log propio (el Timeline existe), fingir streaming, mostrar estado runtime sin evidencia real |
-| **Terminal (xterm)** | Panel independiente, herramienta de shell | confundirse con el dock — son superficies distintas |
+| **HEO Copilot Dock** | Única superficie operacional (Execute/Analyze/Focus/Runtime) | acumular log propio (el Timeline existe), fingir streaming, mostrar estado runtime sin evidencia real, coexistir con otra terminal paralela |
 | **AI Router** | Cascada Ollama → OpenRouter → Anthropic → heurístico | hacer fetch sin validar modelo, ejecutarse desde el cliente |
 | **AMON Agents** | Runtime externo de agentes | invocarse desde SB en esta fase (solo Fase 6 en adelante) |
 

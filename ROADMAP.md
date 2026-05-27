@@ -50,17 +50,15 @@ Reducir fricción visual y transformar SB en un workspace operacional cómodo pa
 - Usar popover dark/glass
 - Chips activos y botón "clear all"
 
-#### Terminal como Workspace Panel
-No solo terminal. Modos:
-- `COMANDO`
-- `ANALIZAR`
-- `FOCO`
-- `AGENTES`
+#### HEO Copilot Dock como única superficie operacional
+Sin terminal paralela. Modos internos del dock:
+- `EXECUTE`
+- `ANALYZE`
+- `FOCUS`
+- `RUNTIME`
 
-Layout dividido:
-- izquierda: comando
-- centro: output
-- derecha: contexto HEO / sugerencias
+Input compartido (`CopilotInput`) abajo, output arriba, contexto HEO en el
+right panel. Una sola superficie, un solo state machine.
 
 #### Right Panel modular
 - Codex Loop
@@ -334,7 +332,7 @@ visualización live tipo Pixel
 
 | Sprint | Enfoque | Entregables clave |
 |--------|---------|-------------------|
-| **Sprint 1** | SB UX urgente | Deep-link cards, filtros dark, topbar clara, terminal workspace panel, right panel modular, modo grafito/negro mate |
+| **Sprint 1** | SB UX urgente | Deep-link cards, filtros dark, topbar clara, HEO Copilot Dock como única superficie operacional, right panel modular, modo grafito/negro mate |
 | **Sprint 2** | SB funcional | Backlog agrupado, timeline 2.0, acciones sugeridas ejecutables, status bar infraestructura |
 | **Sprint 3** | AA commands | `amon ingest`, `amon scan`, `amon audit`, provider manager |
 | **Sprint 4** | Voice MVP | Eventos → notificación hablada, TTS configurable, categorías de prioridad, modo foco con voz |

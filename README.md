@@ -155,7 +155,7 @@ provider se marca como no-disponible en `describeProviders()`.
 | Persistencia | PostgreSQL (Neon / Render) + Drizzle ORM |
 | Validación | Zod (server-side, `lib/validation/`) |
 | Drag & drop | `@dnd-kit/core` + `@dnd-kit/utilities` |
-| Terminal | xterm.js + addon-fit (panel independiente del dock) |
+| Superficie operacional | HEO Copilot Dock (única superficie, sin terminal paralela) |
 | IA | Ollama → OpenRouter → Anthropic → heurístico (modelo validado pre-fetch) |
 | Runtime externo | AMON Agents (NDJSON event stream, lectura por polling) |
 
@@ -311,7 +311,6 @@ Vars:          DATABASE_URL=postgresql://...
 | `POST` | `/api/root-cause` | 5 Whys assist |
 | `POST` | `/api/feedback` | Decisión sobre sugerencias HEO |
 | `GET` | `/api/stream` | SSE bus interno (refresh hints) |
-| `POST` | `/api/terminal/run` | Ejecuta comando en terminal xterm |
 | `POST` | `/api/agents/run` | Ejecuta agente IA local (no AA) |
 
 Endpoints de mutación validan body con Zod
@@ -331,7 +330,6 @@ app/
     tasks/[id]/comments/        GET/POST
     runtime/events/             Tail NDJSON de AMON Agents (Fase 4)
     agents/run/                 Ejecución local de agentes IA
-    terminal/run/               Endpoint xterm
     search/  knowledge/         Búsqueda agregada y KB
     insights/  root-cause/      Motor de análisis y 5 Whys
     feedback/  events/  stream/ Telemetría y SSE interno
@@ -342,7 +340,7 @@ components/
   console/                      command-suggestions, focus-timer, quick-actions
   console/dock/                 dock-workspace, copilot-input, dock-mode-tabs,
                                 command-mode, analyze-mode, focus-mode, agents-mode
-  terminal/                     terminal-panel (xterm, independiente del dock)
+                                (HEO Copilot Dock como única superficie operacional)
   layout/  modals/  ui/
 
 lib/
@@ -356,7 +354,7 @@ lib/
   server/                       request-guard, assemble-card, sync-bus,
                                 action-resolver, action-executor, agent-outputs,
                                 feedback-service, insight-engine, root-cause-analyzer,
-                                terminal-runner, log-event, task-validation
+                                log-event, task-validation
   console/                      command-parser, command-executor, generators
   scoring/                      backlog-scorer
 

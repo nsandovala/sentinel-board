@@ -38,7 +38,7 @@ Correccion critica aplicada durante la auditoria: el directorio anidado sentinel
 - ORM: Drizzle ORM 0.45.2
 - Driver DB: pg 8.16.3 (node-postgres)
 - Base de datos: Neon / PostgreSQL (via DATABASE_URL)
-- UI Terminal: @xterm/xterm
+- Superficie operacional UI: HEO Copilot Dock (única, sin terminal xterm paralela)
 - LLM Router: lib/ai/ai-router.ts (Ollama + LM Studio)
 
 3. ESTADO DE RUTAS API (BACKEND-FIRST)
@@ -55,7 +55,6 @@ Rutas verificadas:
 - /api/dock-commands (GET, POST) — registro de comandos del dock
 - /api/focus-sessions (GET, POST) — gestion de sesiones de enfoque (pomodoro)
 - /api/root-cause (POST) — analisis 5-Whys con datos reales de DB
-- /api/terminal/run (POST) — orquestador HEO Copilot (acciones locales + fallback LLM)
 - /api/agents/run (POST) — ejecutor de agentes YAML definidos
 
 Rutas desconectadas / no encontradas en raiz:

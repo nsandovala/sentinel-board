@@ -9,10 +9,12 @@
 unificado donde el usuario ejecuta acciones, analiza contexto y supervisa el
 runtime de agentes sin abandonar el board.
 
-No es una terminal, no es un chat con un LLM, no es un panel de configuración.
-Es un copiloto **operacional**, dev-first, que convierte intenciones cortas
-(texto en lenguaje natural acotado, comandos, contexto pegado) en cambios
-deterministas sobre el board y en señales para el usuario.
+No es un chat con un LLM, no es un panel de configuración, y desde el cierre
+de la fase Single Operational Surface **es la única superficie operacional
+de SB** — ya no coexiste con una terminal xterm paralela. Es un copiloto
+**operacional**, dev-first, que convierte intenciones cortas (texto en
+lenguaje natural acotado, comandos, contexto pegado) en cambios deterministas
+sobre el board y en señales para el usuario.
 
 Su ubicación física es la franja inferior de la pantalla, redimensionable
 verticalmente (min 240 px expandido, max 65 vh con tope duro de 760 px).
@@ -50,7 +52,8 @@ El dock tiene cuatro modos seleccionables vía tabs. El input es **único**
   - `iniciar foco` / `terminar foco`
 - **No hace:** análisis de texto largo, llamadas LLM, ejecución de scripts shell.
 - **Side-panel:** sugerencias HEO contextuales + acciones rápidas (Iniciar foco,
-  Nueva tarea, Mover estado).
+  Nueva tarea). El resto de operaciones (incluido mover estado) se hace por
+  input — sin modales paralelos.
 
 ### 3.2 ANALYZE
 
