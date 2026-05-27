@@ -151,12 +151,12 @@ export function AnalysisPreview({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/30 pb-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/75">
-            Resultado · {isAgentResult ? "agente planner" : "heuristico local"}
+            Resultado · {isAgentResult ? "agente planner" : "Análisis local, sin LLM"}
           </p>
           <p className="text-[10px] text-muted-foreground">
             {isAgentResult
-              ? "Respuesta via Ollama / OpenRouter · revisa y ejecuta acciones abajo"
-              : "Sin modelo · revisa y ejecuta acciones abajo"}
+              ? "Respuesta via Ollama / OpenRouter / Anthropic · revisa y ejecuta acciones abajo"
+              : "Sin LLM disponible — usando heurística local. Configura un provider IA para análisis con modelo."}
           </p>
         </div>
         <button

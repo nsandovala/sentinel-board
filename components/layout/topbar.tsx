@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Terminal, Search, Filter, FileText, Plus } from "lucide-react";
+import { X, PanelBottom, Search, Filter, FileText, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import { useDock } from "@/components/console/dock/dock-context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
@@ -47,11 +48,6 @@ const priorityOptions = [
   { value: "low", label: "Low" },
 ];
 
-interface TopBarProps {
-  showTerminal?: boolean;
-  onToggleTerminal?: () => void;
-}
-
 interface ActiveFilterChip {
   key: "tag" | "status" | "priority";
   label: string;
@@ -59,7 +55,7 @@ interface ActiveFilterChip {
   clear: () => void;
 }
 
-export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
+export function TopBar() {
   const {
     activeView,
     selectedProjectId,
@@ -70,6 +66,8 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
     tagFilter,
   } = useSentinel();
   const dispatch = useSentinelDispatch();
+  const { dockState, toggleCollapsed } = useDock();
+  const dockOpen = dockState !== "collapsed";
   const [filterOpen, setFilterOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchResponse | null>(null);
@@ -337,7 +335,7 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
 
   return (
     <>
-      <header className="sentinel-topbar flex h-12 shrink-0 items-center gap-2 border-b border-border/40 bg-background px-6">
+      <header className="sentinel-topbar flex h-12 shrink-0 items-center gap-2 border-b border-neutral-900 bg-background px-6">
       <nav
         className="flex min-w-0 flex-1 items-center gap-2 text-sm"
         aria-label="Ubicacion en el workspace"
@@ -712,23 +710,22 @@ export function TopBar({ showTerminal, onToggleTerminal }: TopBarProps) {
           )}
         </div>
 
-        {onToggleTerminal && (
-          <button
-            type="button"
-            onClick={onToggleTerminal}
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/40 px-2.5 text-[12px] font-medium transition-colors",
-              showTerminal
-                ? "bg-primary/15 text-foreground ring-1 ring-primary/25"
-                : "bg-muted text-foreground/70 hover:bg-muted/90 hover:text-foreground",
-            )}
-            title={showTerminal ? "Ocultar terminal local" : "Abrir terminal local"}
-            aria-label={showTerminal ? "Ocultar terminal local" : "Abrir terminal local"}
-          >
-            <Terminal className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Terminal</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className={cn(
+            "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium transition-colors",
+            dockOpen
+              ? "border-white/[0.08] bg-white/[0.06] text-foreground"
+              : "border-neutral-900 bg-[#151515] text-foreground/70 hover:bg-[#1b1b1b] hover:text-foreground",
+          )}
+          title={dockOpen ? "Contraer HEO Copilot" : "Abrir HEO Copilot"}
+          aria-label={dockOpen ? "Contraer HEO Copilot" : "Abrir HEO Copilot"}
+          aria-pressed={dockOpen}
+        >
+          <PanelBottom className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">HEO Copilot</span>
+        </button>
 
         <Button
           type="button"

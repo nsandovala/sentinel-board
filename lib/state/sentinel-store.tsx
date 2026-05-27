@@ -269,6 +269,17 @@ export function SentinelProvider({ children }: { children: ReactNode }) {
     state.tagFilter,
   ]);
 
+  // Focus session ticker: independiente del ciclo de vida del dock —
+  // mientras la sesión esté corriendo, despachamos TICK_FOCUS cada 1s
+  // aunque el dock esté contraído o se desmonte.
+  useEffect(() => {
+    if (state.focusSession.state !== "running") return;
+    const id = setInterval(() => {
+      rawDispatch({ type: "TICK_FOCUS" });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [state.focusSession.state]);
+
   // Centralised reaction to focus-card requests: any module that calls
   // `focusCardById(id)` triggers SELECT_CARD + switch to board view here.
   // Scroll/highlight is owned by the CardItem listener.

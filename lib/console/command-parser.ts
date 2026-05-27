@@ -267,8 +267,8 @@ function checkIncompleteMove(trimmed: string): ParseCommandLineResult | null {
       intent: "move_status",
       readyToExecute: false,
       helpLines: [
-        "Comando «mover» incompleto: necesitás título de tarjeta y estado destino.",
-        "Separá con « a », « → » o « to » entre título y estado.",
+        "Comando «mover» incompleto: necesitas título de tarjeta y estado destino.",
+        "Separa con « a », « → » o « to » entre título y estado.",
       ],
       exampleSnippets: ['mover "Onboarding checkout" a desarrollo', "cambiar bug login a qa"],
     };
@@ -382,8 +382,8 @@ function checkIncompleteLog(trimmed: string): ParseCommandLineResult | null {
       parsed: { action: "unknown", raw: trimmed },
       intent: "log_time",
       readyToExecute: false,
-      helpLines: ["Falta el proyecto: « metí 2h en [proyecto] » o « registrar 2 horas en … »."],
-      exampleSnippets: [`metí ${n}h en Sentinel`, `registrar ${n} horas en Backend`],
+      helpLines: ["Falta el proyecto: « registrar 2 horas en [proyecto] »."],
+      exampleSnippets: [`registrar ${n} horas en Sentinel`, `registrar ${n}h en Backend`],
     };
   }
   return null;
@@ -413,7 +413,7 @@ export function parseCommandLine(input: string): ParseCommandLineResult {
       parsed: { action: "unknown", raw: "" },
       intent: "unknown",
       readyToExecute: false,
-      helpLines: ["Escribí un comando o elegí una sugerencia (flechas en el campo / Tab si está vacío)."],
+      helpLines: ["Escribe un comando o elige una sugerencia (flechas en el campo / Tab si está vacío)."],
       exampleSnippets: [...DEFAULT_EXAMPLES],
     };
   }

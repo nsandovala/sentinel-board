@@ -45,6 +45,9 @@ export function FocusMode({
 
   return (
     <div className="flex flex-col gap-2.5 px-4 py-2.5">
+      <p className="text-[10.5px] leading-snug text-muted-foreground/70">
+        Las sesiones de foco registran tiempo dedicado a una tarea o proyecto. El historial queda en Timeline.
+      </p>
       <div className="flex flex-wrap items-center gap-3 gap-y-1.5">
         <div className="flex items-center gap-2">
           <Clock
@@ -73,10 +76,10 @@ export function FocusMode({
 
         <span className="truncate text-[11px] text-muted-foreground">
           {session.project
-            ? `Proyecto: ${session.project}`
+            ? `Proyecto activo: ${session.project}`
             : projectName
-              ? `Sugerido: ${projectName}`
-              : "Sin proyecto asignado"}
+              ? `Proyecto activo: ${projectName}`
+              : "Sin proyecto activo"}
         </span>
 
         <div className="ml-auto flex flex-wrap gap-1.5">

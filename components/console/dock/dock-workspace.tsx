@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Maximize2, Minimize2 } from "lucide-react";
 
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
-import { MoveStateModal } from "@/components/modals/move-state-modal";
 import { useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
 import { createEvent } from "@/lib/state/sentinel-reducer";
 import { parseCommandLine, type CommandIntent } from "@/lib/console/command-parser";
@@ -19,19 +18,20 @@ import { cn } from "@/lib/utils";
 import type { SentinelCard } from "@/types/card";
 import type { HeoSuggestion } from "@/types/event";
 
-import { DockModeTabs, type DockMode } from "./dock-mode-tabs";
+import { DockModeTabs } from "./dock-mode-tabs";
 import { CommandMode } from "./command-mode";
 import { AnalyzeMode } from "./analyze-mode";
 import { FocusMode } from "./focus-mode";
 import { AgentsMode } from "./agents-mode";
 import { CopilotInput, type CopilotInputAssist } from "./copilot-input";
-
-const DOCK_HEIGHT_STORAGE_KEY = "sentinel:dock-height";
-const DOCK_MIN_HEIGHT = 240;
-const DOCK_DEFAULT_HEIGHT = 340;
-const DOCK_COLLAPSED_HEIGHT = 48;
-const DOCK_MAX_VH = 0.65;
-const DOCK_MAX_HARD_CAP = 760;
+import type { CopilotOutputState } from "./copilot-output";
+import { askCopilot } from "@/lib/console/copilot-client";
+import type { CopilotCardContext } from "@/lib/server/copilot-prompt";
+import {
+  useDock,
+  clampExpandedHeight,
+  DOCK_EXPANDED_MIN,
+} from "./dock-context";
 
 const LIVE_INTENT_ES: Record<CommandIntent, string> = {
   create_task: "Crear tarea",
@@ -53,17 +53,7 @@ const FOCUS_FOOTER_HINT =
   "Escribe el nombre de un proyecto/tarea para iniciar foco. El historial vive en el Timeline.";
 
 const RUNTIME_FOOTER_HINT =
-  "Runtime aún no recibe comandos. Solo muestra estado de agentes.";
-
-function getDockMaxHeight(): number {
-  if (typeof window === "undefined") return DOCK_MAX_HARD_CAP;
-  const vhCap = Math.floor(window.innerHeight * DOCK_MAX_VH);
-  return Math.max(DOCK_MIN_HEIGHT, Math.min(vhCap, DOCK_MAX_HARD_CAP));
-}
-
-function clampDockHeight(height: number): number {
-  return Math.min(Math.max(Math.round(height), DOCK_MIN_HEIGHT), getDockMaxHeight());
-}
+  "Runtime observa eventos NDJSON de AMON Agents. No recibe comandos.";
 
 function buildLiveSuggestions(
   cards: SentinelCard[],
@@ -77,7 +67,7 @@ function buildLiveSuggestions(
   if (blocked) {
     suggestions.push({
       id: `heo-blocked-${blocked.id}`,
-      text: `Destrabar «${blocked.title}»`,
+      text: `Desbloquear «${blocked.title}»`,
       command: `mover "${blocked.title}" a clarificando`,
     });
   }
@@ -86,7 +76,7 @@ function buildLiveSuggestions(
   if (backlog) {
     suggestions.push({
       id: `heo-backlog-${backlog.id}`,
-      text: `Aterrizar «${backlog.title}»`,
+      text: `Clarificar «${backlog.title}»`,
       command: `mover "${backlog.title}" a clarificando`,
     });
   }
@@ -98,7 +88,7 @@ function buildLiveSuggestions(
     const nextStatus = inFlight.status === "qa" ? "listo" : "qa";
     suggestions.push({
       id: `heo-inflight-${inFlight.id}`,
-      text: `Empujar «${inFlight.title}» a ${nextStatus}`,
+      text: `Avanzar «${inFlight.title}» a ${nextStatus}`,
       command: `mover "${inFlight.title}" a ${nextStatus}`,
     });
   }
@@ -121,54 +111,61 @@ function formatChipElapsed(seconds: number): string {
   return `${pad(m)}:${pad(s)}`;
 }
 
-const MODE_TITLES: Record<DockMode, string> = {
-  command: "HEO Copilot · Execute",
-  analyze: "HEO Copilot · Analyze",
-  focus: "HEO Copilot · Focus",
-  agents: "HEO Copilot · Runtime",
-};
-
-const MODE_HINTS: Record<DockMode, string> = {
-  command: "Ejecuta comandos deterministas locales",
-  analyze: "Convierte contexto en backlog accionable",
-  focus: "Sesión de foco · timer y tarea activa",
-  agents: "Estado de los agentes del runtime",
+const MODE_SHORT_LABEL: Record<string, string> = {
+  command: "Execute",
+  analyze: "Analyze",
+  focus: "Focus",
+  agents: "Runtime",
 };
 
 type CopilotStatus = "idle" | "running" | "success" | "error";
 
-const STATUS_LABEL: Record<CopilotStatus, string> = {
-  idle: "idle",
-  running: "running",
-  success: "ok",
-  error: "error",
-};
-
-const STATUS_CLASS: Record<CopilotStatus, string> = {
-  idle: "border-border/40 bg-background/40 text-muted-foreground/75",
-  running: "border-amber-500/25 bg-amber-500/10 text-amber-300",
-  success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
-  error: "border-red-500/25 bg-red-500/10 text-red-300",
+const PROVIDER_LABEL: Record<string, string> = {
+  ollama: "Ollama",
+  openrouter: "OpenRouter",
+  anthropic: "Anthropic",
+  heuristic: "Heurístico",
 };
 
 export function DockWorkspace() {
-  const [expanded, setExpanded] = useState(false);
-  const [dockHeight, setDockHeight] = useState(DOCK_DEFAULT_HEIGHT);
-  const [mode, setMode] = useState<DockMode>("command");
+  const {
+    hydrated,
+    dockState,
+    dockMode: mode,
+    effectiveHeight,
+    expandedHeight,
+    setDockMode,
+    setDockState,
+    setExpandedHeight,
+    toggleCollapsed,
+    toggleSize,
+    lastProvider,
+    setLastProvider,
+  } = useDock();
+
+  const expanded = dockState !== "collapsed";
+
   const [executeValue, setExecuteValue] = useState("");
   const [analyzeValue, setAnalyzeValue] = useState("");
   const [focusValue, setFocusValue] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<LocalAnalysisResult | null>(null);
   const [lastWasAgent, setLastWasAgent] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [copilotStatus, setCopilotStatus] = useState<CopilotStatus>("idle");
   const [lastResultMessage, setLastResultMessage] = useState<string | null>(null);
+  const [copilotOutput, setCopilotOutput] = useState<CopilotOutputState>({
+    phase: "idle",
+    provider: null,
+    text: "",
+    suggestedCommand: null,
+    errorMessage: null,
+    question: null,
+  });
+  const copilotAbortRef = useRef<AbortController | null>(null);
 
   const state = useSentinel();
   const dispatch = useSentinelDispatch();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dragStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -182,9 +179,13 @@ export function DockWorkspace() {
     [defaultProjectName, state.cards, state.selectedProjectId],
   );
 
-  const firstProjectName = state.projects[0]?.name ?? "MiProyecto";
-  const executeTabSuggestion = `crear tarea describir aquí en ${firstProjectName}`;
-  const focusTabSuggestion = defaultProjectName ?? firstProjectName;
+  const firstProjectName = state.projects[0]?.name ?? null;
+  // Tab solo completa cuando hay un proyecto real: deja el cursor listo
+  // después de "crear tarea " para que el usuario sólo escriba el título.
+  const executeTabSuggestion = firstProjectName
+    ? `crear tarea  en ${firstProjectName}`
+    : undefined;
+  const focusTabSuggestion = defaultProjectName ?? firstProjectName ?? undefined;
 
   const activeCard = useMemo(
     () => (state.selectedCardId ? state.cards.find((c) => c.id === state.selectedCardId) ?? null : null),
@@ -208,44 +209,6 @@ export function DockWorkspace() {
     },
     [mode],
   );
-
-  useEffect(() => {
-    if (state.focusSession.state === "running") {
-      intervalRef.current = setInterval(() => {
-        dispatch({ type: "TICK_FOCUS" });
-      }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [state.focusSession.state, dispatch]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(DOCK_HEIGHT_STORAGE_KEY);
-    if (!stored) return;
-    const parsed = Number(stored);
-    if (Number.isFinite(parsed)) {
-      setDockHeight(clampDockHeight(parsed));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(DOCK_HEIGHT_STORAGE_KEY, String(dockHeight));
-  }, [dockHeight]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handleResize = () => {
-      setDockHeight((current) => clampDockHeight(current));
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const runCommandLine = useCallback(
     (line: string): { success: boolean; message: string } => {
@@ -331,6 +294,7 @@ export function DockWorkspace() {
           const result = plannerToLocalAnalysis(planner, text);
           setLastAnalysis(result);
           setLastWasAgent(true);
+          if (typeof json.provider === "string") setLastProvider(json.provider);
 
           const providerLabel =
             json.provider === "ollama"
@@ -368,6 +332,7 @@ export function DockWorkspace() {
       const result = runLocalAnalysis(text);
       setLastAnalysis(result);
       setLastWasAgent(false);
+      setLastProvider("heuristic");
       dispatch({
         type: "ADD_EVENT",
         event: createEvent(
@@ -378,8 +343,120 @@ export function DockWorkspace() {
       setAnalyzing(false);
       return { success: true, message: "Análisis local (fallback heurístico)" };
     },
-    [dispatch],
+    [dispatch, setLastProvider],
   );
+
+  const buildCardContext = useCallback(
+    (card: SentinelCard | null): CopilotCardContext | undefined => {
+      if (!card) return undefined;
+      const projectName = state.projects.find((p) => p.id === card.projectId)?.name;
+      return {
+        id: card.id,
+        title: card.title,
+        description: card.description,
+        status: card.status,
+        priority: card.priority,
+        projectName,
+        tags: card.tags,
+        checklist: card.checklist?.map((it) => ({ text: it.text, status: it.status })),
+        blocked: card.blocked,
+        blockerReason: card.blockerReason,
+      };
+    },
+    [state.projects],
+  );
+
+  const runCopilotAsk = useCallback(
+    async (question: string): Promise<{ success: boolean; message: string }> => {
+      // Cancel any in-flight ask so the visible state reflects the latest turn only.
+      copilotAbortRef.current?.abort();
+      const controller = new AbortController();
+      copilotAbortRef.current = controller;
+
+      setCopilotOutput({
+        phase: "thinking",
+        provider: null,
+        text: "",
+        suggestedCommand: null,
+        errorMessage: null,
+        question,
+      });
+
+      // Tiny delay-less transition: switch to "consulting" so the user sees both phases.
+      setCopilotOutput((prev) => ({ ...prev, phase: "consulting" }));
+
+      const reply = await askCopilot(
+        {
+          message: question,
+          card: buildCardContext(activeCard),
+          projectName: defaultProjectName,
+        },
+        controller.signal,
+      );
+
+      if (controller.signal.aborted) {
+        return { success: false, message: "Solicitud cancelada" };
+      }
+
+      if (reply.ok) {
+        if (reply.provider && reply.provider !== "none") {
+          setLastProvider(reply.provider);
+        }
+        setCopilotOutput({
+          phase: "done",
+          provider: reply.provider,
+          text: reply.text,
+          suggestedCommand: reply.suggestedCommand,
+          errorMessage: null,
+          question,
+        });
+        dispatch({
+          type: "ADD_EVENT",
+          event: createEvent(
+            "heo_suggestion",
+            `HEO Copilot (${reply.provider}) respondió a: ${question.slice(0, 120)}${
+              question.length > 120 ? "…" : ""
+            }`,
+          ),
+        });
+        return {
+          success: true,
+          message: `HEO respondió via ${reply.provider}`,
+        };
+      }
+
+      setCopilotOutput({
+        phase: "error",
+        provider: reply.provider,
+        text: "",
+        suggestedCommand: null,
+        errorMessage:
+          reply.error ?? "Ningún provider IA respondió. Revisa configuración.",
+        question,
+      });
+      dispatch({
+        type: "ADD_EVENT",
+        event: createEvent(
+          "system",
+          `HEO Copilot: sin respuesta del AI router (${reply.error ?? "sin detalle"}).`,
+        ),
+      });
+      return { success: false, message: reply.error ?? "Sin respuesta del AI router" };
+    },
+    [activeCard, buildCardContext, defaultProjectName, dispatch, setLastProvider],
+  );
+
+  const dismissCopilotOutput = useCallback(() => {
+    copilotAbortRef.current?.abort();
+    setCopilotOutput({
+      phase: "idle",
+      provider: null,
+      text: "",
+      suggestedCommand: null,
+      errorMessage: null,
+      question: null,
+    });
+  }, []);
 
   const handleCopilotSubmit = useCallback(async () => {
     const value = currentValue.trim();
@@ -391,12 +468,24 @@ export function DockWorkspace() {
 
     try {
       if (mode === "command") {
-        const { success, message } = runCommandLine(value);
-        setCopilotStatus(success ? "success" : "error");
-        setLastResultMessage(message);
-        if (success) setExecuteValue("");
+        const outcome = parseCommandLine(value);
+        // Parser-recognized commands stay deterministic. Anything the parser
+        // can't classify is forwarded to HEO Copilot via the AI router so the
+        // dock keeps its conversational behaviour without an xterm panel.
+        if (outcome.readyToExecute && outcome.parsed.action !== "unknown") {
+          const { success, message } = runCommandLine(value);
+          setCopilotStatus(success ? "success" : "error");
+          setLastResultMessage(message);
+          if (success) setExecuteValue("");
+        } else {
+          if (dockState === "collapsed") setDockState("compact");
+          const { success, message } = await runCopilotAsk(value);
+          setCopilotStatus(success ? "success" : "error");
+          setLastResultMessage(message);
+          if (success) setExecuteValue("");
+        }
       } else if (mode === "analyze") {
-        setExpanded(true);
+        if (dockState !== "expanded") setDockState("expanded");
         const { success, message } = await runAnalyzeSubmit(value);
         setCopilotStatus(success ? "success" : "error");
         setLastResultMessage(message);
@@ -416,11 +505,19 @@ export function DockWorkspace() {
       setCopilotStatus("error");
       setLastResultMessage(err instanceof Error ? err.message : "Error desconocido");
     }
-  }, [currentValue, mode, runCommandLine, runAnalyzeSubmit]);
+  }, [
+    currentValue,
+    mode,
+    runCommandLine,
+    runAnalyzeSubmit,
+    runCopilotAsk,
+    dockState,
+    setDockState,
+  ]);
 
   const handleSuggestionPick = useCallback(
     (command: string) => {
-      setMode("command");
+      setDockMode("command");
       setExecuteValue("");
       setCopilotStatus("running");
       setLastResultMessage(null);
@@ -428,7 +525,7 @@ export function DockWorkspace() {
       setCopilotStatus(success ? "success" : "error");
       setLastResultMessage(message);
     },
-    [runCommandLine],
+    [runCommandLine, setDockMode],
   );
 
   const handleFocusStart = useCallback(() => {
@@ -446,8 +543,8 @@ export function DockWorkspace() {
   );
 
   const expandIfCollapsed = useCallback(() => {
-    if (!expanded) setExpanded(true);
-  }, [expanded]);
+    if (dockState === "collapsed") setDockState("compact");
+  }, [dockState, setDockState]);
 
   const stopResize = useCallback(() => {
     dragStateRef.current = null;
@@ -464,13 +561,12 @@ export function DockWorkspace() {
     const handlePointerMove = (event: PointerEvent) => {
       const dragState = dragStateRef.current;
       if (!dragState) return;
-      const nextHeight = clampDockHeight(dragState.startHeight + (dragState.startY - event.clientY));
-      setDockHeight(nextHeight);
+      setExpandedHeight(
+        clampExpandedHeight(dragState.startHeight + (dragState.startY - event.clientY)),
+      );
     };
 
-    const handlePointerUp = () => {
-      stopResize();
-    };
+    const handlePointerUp = () => stopResize();
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
@@ -479,22 +575,27 @@ export function DockWorkspace() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [isResizing, stopResize]);
+  }, [isResizing, stopResize, setExpandedHeight]);
 
   const handleResizeStart = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      const startHeight = expanded ? dockHeight : DOCK_DEFAULT_HEIGHT;
-      if (!expanded) {
-        setExpanded(true);
-        setDockHeight(clampDockHeight(startHeight));
+      // Dragging the handle always works in the expanded state — promote
+      // from collapsed/compact so the drag has somewhere to grow.
+      const startHeight =
+        dockState === "expanded"
+          ? expandedHeight
+          : clampExpandedHeight(expandedHeight || DOCK_EXPANDED_MIN);
+      if (dockState !== "expanded") {
+        setDockState("expanded");
+        setExpandedHeight(startHeight);
       }
       dragStateRef.current = { startY: event.clientY, startHeight };
       setIsResizing(true);
       document.body.style.cursor = "ns-resize";
       document.body.style.userSelect = "none";
     },
-    [dockHeight, expanded],
+    [dockState, expandedHeight, setDockState, setExpandedHeight],
   );
 
   const copilotAssist = useMemo<CopilotInputAssist | null>(() => {
@@ -538,117 +639,139 @@ export function DockWorkspace() {
     return RUNTIME_FOOTER_HINT;
   }, [mode]);
 
-  const copilotRunning = (mode === "analyze" && analyzing) || copilotStatus === "running";
-
+  const copilotAsking =
+    copilotOutput.phase === "thinking" || copilotOutput.phase === "consulting";
+  const copilotRunning =
+    (mode === "analyze" && analyzing) || copilotStatus === "running" || copilotAsking;
   const focusChipState = focusRunning ? "running" : focusPaused ? "paused" : "idle";
-  const dockHeightStyle = expanded ? dockHeight : DOCK_COLLAPSED_HEIGHT;
-
-  const statusBadgeLabel = copilotRunning ? "running" : STATUS_LABEL[copilotStatus];
-  const statusBadgeClass = copilotRunning ? STATUS_CLASS.running : STATUS_CLASS[copilotStatus];
+  const providerLabel = lastProvider ? PROVIDER_LABEL[lastProvider] ?? lastProvider : null;
 
   return (
     <>
       <div
         className={cn(
-          "sentinel-command-dock flex shrink-0 flex-col border-t border-border/35",
-          !isResizing && "transition-[height] duration-200 ease-out",
+          "sentinel-command-dock flex shrink-0 flex-col border-t border-neutral-900",
+          hydrated && !isResizing && "transition-[height] duration-200 ease-out",
         )}
         role="region"
         aria-label="HEO Copilot"
-        style={{ height: dockHeightStyle }}
+        style={{ height: effectiveHeight }}
       >
+        {/* Resize handle — matte, contraste suficiente sin línea brillante. */}
         <button
           type="button"
           onPointerDown={handleResizeStart}
           className={cn(
-            "group flex h-3 shrink-0 cursor-ns-resize items-center justify-center border-b border-border/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
-            expanded ? "hover:bg-white/[0.03]" : "opacity-70 hover:opacity-100",
+            "group flex h-3 shrink-0 cursor-ns-resize items-center justify-center border-b border-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40",
+            expanded ? "hover:bg-white/[0.03]" : "opacity-90 hover:opacity-100",
           )}
           aria-label="Redimensionar HEO Copilot"
         >
-          <span className="h-1 w-14 rounded-full bg-border/70 transition-colors group-hover:bg-muted-foreground/70" />
+          <span className="h-[3px] w-12 rounded-full bg-neutral-700/70 transition-colors group-hover:bg-neutral-500/80" />
         </button>
 
-        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-border/30 px-1 py-0.5">
+        {/* Header */}
+        <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-neutral-900 px-2 py-1">
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground/70 transition-colors hover:text-foreground/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-            aria-label={expanded ? "Colapsar HEO Copilot" : "Expandir HEO Copilot"}
+            onClick={toggleCollapsed}
+            className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground/70 transition-colors hover:text-foreground/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+            aria-label={expanded ? "Contraer HEO Copilot" : "Abrir HEO Copilot"}
             aria-expanded={expanded}
-            title={expanded ? "Colapsar (mostrar solo barra)" : "Expandir HEO Copilot"}
           >
             {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-            <span className="text-[11px] font-semibold tracking-tight text-foreground/85">
+            <span className="text-[11px] font-semibold tracking-tight text-foreground/90">
               HEO Copilot
             </span>
           </button>
 
           {expanded ? (
-            <>
-              <DockModeTabs active={mode} onChange={setMode} />
-
-              <div className="ml-2 hidden min-w-0 flex-1 flex-col leading-tight sm:flex">
-                <span className="truncate text-[11px] font-semibold tracking-tight text-foreground/85">
-                  {MODE_TITLES[mode]}
-                </span>
-                <span className="truncate text-[10px] text-muted-foreground/70">
-                  {lastResultMessage
-                    ? lastResultMessage
-                    : `${MODE_HINTS[mode]} · Altura ${dockHeight}px`}
-                </span>
-              </div>
-            </>
+            <DockModeTabs active={mode} onChange={setDockMode} />
           ) : (
-            <span className="ml-1 truncate text-[11px] uppercase tracking-wider text-muted-foreground/70">
-              {mode === "command" ? "Execute" : mode === "analyze" ? "Analyze" : mode === "focus" ? "Focus" : "Runtime"}
+            <span className="ml-1 truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground/65">
+              {MODE_SHORT_LABEL[mode]}
             </span>
           )}
 
-          <span
-            className={cn(
-              "ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-              statusBadgeClass,
-            )}
-            aria-live="polite"
-            title="Estado del último comando del HEO Copilot"
-          >
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {/* Status dot */}
             <span
               className={cn(
-                "h-1.5 w-1.5 shrink-0 rounded-full",
+                "inline-flex items-center gap-1.5 rounded-md border border-white/[0.05] bg-[#151515] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
                 copilotRunning
-                  ? "bg-amber-400/85 animate-pulse"
+                  ? "text-amber-300"
                   : copilotStatus === "success"
-                    ? "bg-emerald-400/80"
+                    ? "text-emerald-300"
                     : copilotStatus === "error"
-                      ? "bg-red-400/85"
-                      : "bg-muted-foreground/40",
+                      ? "text-red-300"
+                      : "text-muted-foreground/70",
               )}
-              aria-hidden
-            />
-            {statusBadgeLabel}
-          </span>
-
-          {expanded && (
-            <button
-              type="button"
-              onClick={() => setMode("focus")}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-mono tabular-nums transition-colors",
-                focusChipState === "running"
-                  ? "border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
-                  : focusChipState === "paused"
-                    ? "border-border/40 bg-muted/40 text-muted-foreground hover:text-foreground/80"
-                    : "border-border/35 bg-background/40 text-muted-foreground/70 hover:text-foreground/70",
-              )}
-              title="Abrir modo Focus"
-              aria-label={`Foco ${focusChipState}, abrir modo Focus`}
+              aria-live="polite"
+              title={lastResultMessage ?? "Estado del último comando del HEO Copilot"}
             >
-              <Clock className="h-3 w-3" />
-              {formatChipElapsed(state.focusSession.elapsed)}
-              {focusChipState === "paused" && <span className="text-[9px] uppercase">pausa</span>}
-            </button>
-          )}
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  copilotRunning
+                    ? "bg-amber-400/85 animate-pulse"
+                    : copilotStatus === "success"
+                      ? "bg-emerald-400/80"
+                      : copilotStatus === "error"
+                        ? "bg-red-400/85"
+                        : "bg-muted-foreground/40",
+                )}
+                aria-hidden
+              />
+              {copilotRunning ? "running" : copilotStatus === "success" ? "ok" : copilotStatus}
+            </span>
+
+            {/* Provider — only shown once an analyze run reports one. */}
+            {providerLabel && (
+              <span
+                className="hidden items-center rounded-md border border-white/[0.05] bg-[#151515] px-2 py-0.5 font-mono text-[10px] text-muted-foreground/70 sm:inline-flex"
+                title="Provider IA de la última ejecución"
+              >
+                {providerLabel}
+              </span>
+            )}
+
+            {/* Focus timer chip — only when a session exists */}
+            {expanded && focusChipState !== "idle" && (
+              <button
+                type="button"
+                onClick={() => setDockMode("focus")}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] tabular-nums transition-colors",
+                  focusChipState === "running"
+                    ? "border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
+                    : "border-white/[0.05] bg-[#151515] text-muted-foreground hover:text-foreground/80",
+                )}
+                title="Abrir modo Focus"
+                aria-label={`Foco ${focusChipState}, abrir modo Focus`}
+              >
+                <Clock className="h-3 w-3" />
+                {formatChipElapsed(state.focusSession.elapsed)}
+                {focusChipState === "paused" && <span className="text-[9px] uppercase">pausa</span>}
+              </button>
+            )}
+
+            {/* Compact <-> expanded toggle */}
+            {expanded && (
+              <button
+                type="button"
+                onClick={toggleSize}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/[0.05] bg-[#151515] text-muted-foreground/70 transition-colors hover:text-foreground/90"
+                aria-label={dockState === "expanded" ? "Modo compacto" : "Modo expandido"}
+                title={dockState === "expanded" ? "Compactar" : "Expandir"}
+              >
+                {dockState === "expanded" ? (
+                  <Minimize2 className="h-3 w-3" />
+                ) : (
+                  <Maximize2 className="h-3 w-3" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {expanded && (
@@ -663,17 +786,16 @@ export function DockWorkspace() {
                 <CommandMode
                   liveSuggestions={liveSuggestions}
                   onSuggestionPick={handleSuggestionPick}
-                  onOpenCreateTask={() => {
-                    setCreateOpen(true);
-                    setExpanded(true);
-                  }}
-                  onOpenMoveState={() => {
-                    setMoveOpen(true);
-                    setExpanded(true);
-                  }}
+                  onOpenCreateTask={() => setCreateOpen(true)}
                   onFocusStart={handleFocusStart}
                   onFocusEnd={handleFocusEnd}
                   focusRunning={focusRunning}
+                  copilotOutput={copilotOutput}
+                  onApplyCopilotSuggestion={(command) => {
+                    setExecuteValue(command);
+                    dismissCopilotOutput();
+                  }}
+                  onDismissCopilotOutput={dismissCopilotOutput}
                 />
               )}
 
@@ -704,23 +826,25 @@ export function DockWorkspace() {
               {mode === "agents" && <AgentsMode expanded={expanded} />}
             </div>
 
-            <CopilotInput
-              mode={mode}
-              value={currentValue}
-              onChange={setCurrentValue}
-              onSubmit={handleCopilotSubmit}
-              onFocus={expandIfCollapsed}
-              running={copilotRunning}
-              assist={copilotAssist}
-              tabSuggestion={
-                mode === "command"
-                  ? executeTabSuggestion
-                  : mode === "focus"
-                    ? focusTabSuggestion
-                    : undefined
-              }
-              footerHint={copilotFooterHint}
-            />
+            {mode !== "agents" && (
+              <CopilotInput
+                mode={mode}
+                value={currentValue}
+                onChange={setCurrentValue}
+                onSubmit={handleCopilotSubmit}
+                onFocus={expandIfCollapsed}
+                running={copilotRunning}
+                assist={copilotAssist}
+                tabSuggestion={
+                  mode === "command"
+                    ? executeTabSuggestion
+                    : mode === "focus"
+                      ? focusTabSuggestion
+                      : undefined
+                }
+                footerHint={copilotFooterHint}
+              />
+            )}
           </div>
         )}
       </div>
@@ -730,7 +854,6 @@ export function DockWorkspace() {
         onOpenChange={setCreateOpen}
         defaultProjectId={defaultProjectId}
       />
-      <MoveStateModal open={moveOpen} onOpenChange={setMoveOpen} />
     </>
   );
 }

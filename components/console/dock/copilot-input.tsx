@@ -18,7 +18,7 @@ const PLACEHOLDERS: Record<DockMode, string> = {
   command: "Ejecuta una acción: mover card, crear tarea, iniciar foco...",
   analyze: "Pega una idea, contexto o problema para convertirlo en backlog...",
   focus: "Define el foco actual o vincula una tarea...",
-  agents: "Runtime se conectará al Event Stream de AMON Agents en una fase posterior.",
+  agents: "Runtime observa eventos NDJSON de AMON Agents. No recibe comandos.",
 };
 
 const ICONS: Record<DockMode, LucideIcon> = {
@@ -104,7 +104,7 @@ export function CopilotInput({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-0.5 border-t border-border/35 bg-background/35 px-2 py-1.5",
+        "flex min-w-0 flex-col gap-0.5 border-t border-neutral-900 bg-background/35 px-2 py-1.5",
         disabled && "opacity-70",
       )}
     >
