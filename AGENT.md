@@ -17,7 +17,8 @@ en el mismo PR.
 | Capa | Source of truth |
 |---|---|
 | Estado del board / cards / comentarios / timeline / focus / knowledge | **PostgreSQL (Neon)** vía Drizzle |
-| Eventos del runtime de agentes | **Archivo NDJSON** que emite AMON Agents (`AMON_EVENTS_PATH`) |
+| Eventos del pipeline | **Archivo NDJSON** que emite AMON Agents (`AMON_EVENTS_PATH`) |
+| Estado operacional local | **AA Ops snapshot** en loopback (`AMON_OPS_SNAPSHOT_URL`), proyectado en SB sin rutas locales |
 | Configuración runtime | `.env.local` (no commitear) |
 | Modelos IA válidos | `lib/ai/models.ts` |
 | Contratos de payload | `lib/validation/tasks.ts` (Zod) |
@@ -28,9 +29,12 @@ Reglas derivadas:
 - **Postgres es la verdad para SB.** Cualquier estado UI que sobreviva un
   refresh tiene que estar respaldado por una tabla. Nada de estados visibles
   que solo viven en React.
-- **NDJSON es la verdad para el runtime de AA.** SB no inventa estado de
+- **NDJSON es la verdad para eventos del pipeline de AA.** SB no inventa estado de
   agentes — si el archivo no existe, el modo Runtime lo declara como
   "pendiente" en vez de fingir actividad.
+- **Ops snapshot es la verdad para Worker/Jarvis/Claudio/Guardian.** El puente
+  local de solo lectura deriva estados desde heartbeat, jobs y revisiones
+  actuales. Un snapshot ausente o inválido se presenta offline.
 - **AA no comparte DB con SB.** AA es runtime externo, sin DB propia,
   con su propio outputs/. SB observa por NDJSON; en Fase 6 SB podrá
   emitir trabajo hacia AA por contrato explícito.
