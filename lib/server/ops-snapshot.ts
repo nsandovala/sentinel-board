@@ -47,16 +47,17 @@ export function normalizeOpsSnapshot(input: unknown, now = Date.now()): SafeOpsS
   const workerLive = Boolean(workerId && workerRaw?.status === "online" && age(heartbeat, now) <= HEARTBEAT_STALE_MS);
   const workerState: OpsState = !workerId || workerRaw?.status === "offline" ? "offline" : workerLive ? "available" : "stale";
 
-  const reviews = raw.guardianReviews.flatMap(value => {
+  const validatedReviews = raw.guardianReviews.flatMap(value => {
     const item = record(value);
     const id = safeId(item?.reviewId), jobId = safeId(item?.workerJobId);
     const reviewedAt = timestamp(item?.reviewedAt, now);
     if (!id || !jobId || !reviewedAt || !VERDICTS.has(item?.verdict as string)) return [];
     return [{ id, jobId, verdict: item!.verdict as string, reviewedAt,
       findings: Number.isSafeInteger(item?.findingsCount) && (item!.findingsCount as number) >= 0 ? item!.findingsCount as number : 0 }];
-  }).sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt)).slice(0, 30);
-  const latestReview = new Map<string, (typeof reviews)[number]>();
-  for (const review of reviews) if (!latestReview.has(review.jobId)) latestReview.set(review.jobId, review);
+  }).sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt));
+  const latestReview = new Map<string, (typeof validatedReviews)[number]>();
+  for (const review of validatedReviews) if (!latestReview.has(review.jobId)) latestReview.set(review.jobId, review);
+  const reviews = validatedReviews.slice(0, 30);
 
   const jobs = raw.jobs.flatMap(value => {
     const item = record(value);

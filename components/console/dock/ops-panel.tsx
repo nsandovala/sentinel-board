@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { startOpsPolling } from "@/lib/client/ops-polling";
 import type { SafeOpsSnapshot, OpsState } from "@/lib/server/ops-snapshot";
 
 const labels: Record<OpsState, string> = {
@@ -14,24 +15,7 @@ const colors: Record<OpsState, string> = {
 
 export function OpsPanel() {
   const [snapshot, setSnapshot] = useState<SafeOpsSnapshot | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    let pending = false;
-    const load = async () => {
-      if (pending) return;
-      pending = true;
-      try {
-        const response = await fetch("/api/runtime/ops", { cache: "no-store" });
-        if (!response.ok) throw new Error("offline");
-        const data = await response.json() as SafeOpsSnapshot;
-        if (mounted) setSnapshot(data);
-      } catch { if (mounted) setSnapshot(null); }
-      finally { pending = false; }
-    };
-    void load();
-    const timer = setInterval(() => void load(), 3000);
-    return () => { mounted = false; clearInterval(timer); };
-  }, []);
+  useEffect(() => startOpsPolling(setSnapshot), []);
 
   const worker = snapshot?.worker;
   return <section className="rounded-md border border-white/[0.06] bg-[#151515] p-3" aria-label="Estado operacional de AMON">
