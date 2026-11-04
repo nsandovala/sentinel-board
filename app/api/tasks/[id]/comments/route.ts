@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, asc } from "drizzle-orm";
@@ -5,7 +6,6 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { cardComments, tasks } from "@/lib/db/schema";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import {
   postCommentBodySchema,
   extractCommentBody,
@@ -32,7 +32,9 @@ function internalError() {
   );
 }
 
-export async function GET(_req: NextRequest, { params }: RouteContext) {
+export async function GET(req: NextRequest, { params }: RouteContext) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const { id } = await params;
 
@@ -59,9 +61,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     const { id } = await params;
 

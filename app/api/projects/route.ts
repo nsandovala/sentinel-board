@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { authorizeApi } from "@/lib/server/api-auth";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { projects } from "@/lib/db/schema";
 import type { Project } from "@/types/project";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const rows = await db.select().from(projects);
 

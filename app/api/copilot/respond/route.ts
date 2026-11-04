@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 /**
  * POST /api/copilot/respond
  *
@@ -12,7 +13,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { routeAI } from "@/lib/ai/ai-router";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import {
   buildCopilotPrompt,
   extractSuggestedCommand,
@@ -69,7 +69,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const denied = rejectIfUnauthorized(req);
+  const denied = await authorizeApi(req);
   if (denied) return denied;
 
   let raw: unknown;

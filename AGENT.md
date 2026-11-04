@@ -145,10 +145,21 @@ cliente.
 
 ### Auth
 
-`lib/server/request-guard.ts → rejectIfUnauthorized(req)` se aplica a
-endpoints de escritura: loopback siempre permitido, externo requiere
-`SENTINEL_API_TOKEN` por header. **No** retirar el guard "porque molesta
-en dev"; ajustar la config local.
+Todos los 28 handlers de API verifican `await authorizeApi(req)` antes de
+leer datos o ejecutar efectos; `proxy.ts` aplica la misma política y deniega
+métodos/rutas no inventariados. Clerk verifica la sesión y `authorizedParties`;
+solo `AMON_OWNER_CLERK_USER_ID` recibe permisos humanos. No existe bypass por
+loopback, Host, X-Forwarded-For o X-Real-IP.
+
+Las mutaciones del navegador requieren Origin en `CLERK_AUTHORIZED_PARTIES`
+y coincidencia con el destino. La credencial de servicio solo autoriza
+`POST /api/agents/import`. `SENTINEL_API_TOKEN` se acepta temporalmente como
+credencial legacy de esa misma importación, sin permisos para otras APIs.
+El puente Ops requiere además loopback y está bloqueado en producción.
+El stream SSE se cierra al vencer el token o a los 60 segundos para reautorizar.
+
+Matriz, variables, transición del consumidor AA y límites de validación:
+[docs/SEC-SB-AUTH-01.md](docs/SEC-SB-AUTH-01.md).
 
 ---
 

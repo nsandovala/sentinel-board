@@ -1,11 +1,11 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import runAgent from "@/lib/agents/run-agent";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     const body = await req.json();
 

@@ -25,7 +25,12 @@ const compiled = await build({
   entryPoints: ["tests/ui/interactions.browser.tsx"], bundle: true, write: false,
   format: "iife", platform: "browser", jsx: "automatic",
   define: { "process.env.NODE_ENV": '"development"' },
-  plugins: baseline ? [{
+  plugins: [{
+    name: "isolated-clerk-account-control",
+    setup(plugin) {
+      plugin.onResolve({ filter: /^@clerk\/nextjs$/ }, () => ({ path: path.resolve("tests/ui/clerk-fixture.tsx") }));
+    },
+  }, ...(baseline ? [{
     name: "compare-main-components",
     setup(plugin) {
       plugin.onLoad({ filter: /\.tsx$/ }, args => {
@@ -34,7 +39,7 @@ const compiled = await build({
         return { contents: execFileSync("git", ["show", "HEAD:" + relative], { encoding: "utf8" }), loader: "tsx", resolveDir: path.dirname(args.path) };
       });
     },
-  }] : [],
+  }] : [])],
 });
 const bundle = compiled.outputFiles[0].contents;
 const server = createServer((req, res) => {

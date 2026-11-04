@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { NextRequest } from "next/server";
-import { GET } from "./route";
+import { loadHandlers, ownerSession } from "../../../../tests/auth/handlers.mjs";
+
+const fixture = loadHandlers().then(app => { app.setSession(ownerSession()); return app; });
+const GET = async (req: NextRequest) => (await fixture).routes["/api/runtime/ops"].GET(req);
 
 const originalFetch = globalThis.fetch;
 const originalUrl = process.env.AMON_OPS_SNAPSHOT_URL;

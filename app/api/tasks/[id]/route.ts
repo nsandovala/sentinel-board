@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -50,6 +51,8 @@ function buildUpdatePayload(body: PatchTaskBody): Record<string, unknown> {
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const { id } = await params;
 
@@ -125,7 +128,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: RouteContext) {
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const { id } = await params;
 

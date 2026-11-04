@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { createFeedback, listFeedback, getFeedbackMetrics } from "@/lib/server/feedback-service";
 
@@ -15,6 +16,8 @@ interface FeedbackBody {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const body = (await req.json()) as FeedbackBody;
 
@@ -66,6 +69,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") ?? undefined;

@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { focusSessions } from "@/lib/db/schema";
@@ -15,6 +16,8 @@ interface FocusSessionBody {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const body = (await req.json()) as FocusSessionBody;
 
@@ -93,7 +96,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const rows = await db
       .select()

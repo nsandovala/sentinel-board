@@ -23,10 +23,14 @@ Desplegar Sentinel Board en Render como `Web Service`, usando Neon/Postgres por 
 
 ### Seguridad
 
-- `SENTINEL_API_TOKEN`
-  - Requerido para integraciones externas hacia endpoints sensibles.
-  - Los requests desde `localhost` siguen permitidos para pruebas locales.
-  - La UI del mismo origen web puede escribir sin exponer el token al browser.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+- `AMON_OWNER_CLERK_USER_ID`: único usuario autorizado.
+- `CLERK_AUTHORIZED_PARTIES`: orígenes HTTPS exactos, separados por coma.
+- `AMON_IMPORT_TOKEN`: únicamente `POST /api/agents/import`.
+- `SENTINEL_API_TOKEN`: compatibilidad temporal de importación; retirar después de rotar AA.
+- Ningún acceso anónimo por localhost. El token de servicio no autoriza APIs humanas.
+- Las mutaciones desde la UI usan sesión y Origin, sin token de servicio en el cliente.
+- [Política, matriz de métodos y QA pendiente](docs/SEC-SB-AUTH-01.md).
 
 ### IA en produccion
 
@@ -66,96 +70,26 @@ Desplegar Sentinel Board en Render como `Web Service`, usando Neon/Postgres por 
 - Si la base todavia no tiene tablas creadas, ejecuta una vez:
 - `npm run db:push`
 
-## Endpoint nuevo
+## Integración con AMON Agents
 
-### `POST /api/agent-inputs`
+El endpoint existente es `POST /api/agents/import`, no `/api/agent-inputs`.
+Acepta el payload AA con `externalTaskId` y confirma recepción; actualmente
+no persiste en PostgreSQL. Mantiene `ok`, `received`, `taskId` y `message`.
 
-Body:
+El consumidor AA conserva `SENTINEL_BOARD_AGENT_TOKEN` y envía
+`Authorization: Bearer`. Su valor debe corresponder a `AMON_IMPORT_TOKEN`
+en SB. Durante la rotación SB acepta también `SENTINEL_API_TOKEN` antiguo,
+exclusivamente en importación. No cambiar el payload ni el nombre de variable
+del consumidor para esta transición.
 
-```json
-{
-  "source": "manual",
-  "projectSlug": "sentinel-board",
-  "title": "Idea de backlog",
-  "content": "Contexto libre de la idea",
-  "tags": ["deploy", "idea"]
-}
-```
+## Validación previa a cualquier despliegue
 
-Efecto:
-
-- Busca proyecto por `slug`
-- Crea `knowledge_entry`
-- Crea `task` en `idea_bruta`
-- Crea `event` en timeline
-- Devuelve `projectId`, `taskId`, `knowledgeEntryId`, `eventId`
-
-## Integracion minima con amon_agents
-
-- `amon_agents` puede enviar ideas a Sentinel Board usando `POST /api/agent-inputs`.
-- Recomendacion:
-  - `source=amon_agents`
-  - `projectSlug=amon_agents` o el proyecto destino real
-  - `Authorization: Bearer $SENTINEL_API_TOKEN`
-
-## Pruebas manuales
-
-Asumiendo app local en `http://localhost:3000`.
-
-### Crear idea manual
-
-```bash
-curl -X POST http://localhost:3000/api/agent-inputs \
-  -H "Content-Type: application/json" \
-  -d "{\"source\":\"manual\",\"projectSlug\":\"sentinel-board\",\"title\":\"Validar deploy Render + Neon\",\"content\":\"Necesitamos checklist de deploy, smoke test y validacion de variables en Render.\",\"tags\":[\"deploy\",\"render\",\"neon\"]}"
-```
-
-### Simular idea desde amon_agents
-
-```bash
-curl -X POST http://localhost:3000/api/agent-inputs \
-  -H "Content-Type: application/json" \
-  -d "{\"source\":\"amon_agents\",\"projectSlug\":\"amon_agents\",\"title\":\"Convertir analisis comercial en backlog\",\"content\":\"Amon detecto oportunidades y debe crear backlog minimo con prioridad de captura.\",\"tags\":[\"amon\",\"backlog\",\"sync\"]}"
-```
-
-### Crear idea remota con token
-
-```bash
-curl -X POST https://TU-SERVICE.onrender.com/api/agent-inputs \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TU_SENTINEL_API_TOKEN" \
-  -d "{\"source\":\"terminal\",\"projectSlug\":\"sentinel-board\",\"title\":\"Idea remota\",\"content\":\"Prueba remota del endpoint seguro.\",\"tags\":[\"remote\"]}"
-```
-
-### Listar tasks
-
-```bash
-curl "http://localhost:3000/api/tasks?status=idea_bruta"
-```
-
-### Listar knowledge
-
-```bash
-curl "http://localhost:3000/api/knowledge?limit=20"
-```
-
-## Validacion funcional
-
-- Crear idea por `POST /api/agent-inputs`
-- Confirmar que aparece en:
-  - board/backlog por `GET /api/tasks`
-  - timeline por `GET /api/events`
-  - knowledge por `GET /api/knowledge`
-- En la UI, `Analizar -> Crear en board` ya persiste via backend real
-
-## Checklist final de deploy
-
-- `DATABASE_URL` de Neon cargada en Render
-- `SENTINEL_API_TOKEN` cargado en Render
-- `OPENROUTER_API_KEY` cargado en Render
-- `OPENROUTER_MODEL` definido
-- `npm ci && npm run build` pasa
-- `npm run start` levanta en local
-- `POST /api/agent-inputs` responde `ok: true`
-- Se valida aparicion en board/backlog/timeline/knowledge
-- Render configurado como `Web Service`, no `Static Site`
+- Ejecutar pruebas de autorización, Runtime, polling e interacción.
+- Completar QA real con Clerk de desarrollo: ingreso, propietario, usuario
+  ajeno, expiración, cierre de sesión y llamadas directas a API.
+- Configurar explícitamente los orígenes autorizados; no derivarlos de cabeceras.
+- Confirmar auditorías y tracing sin configuración privada.
+- Las consultas a tasks/knowledge y las mutaciones requieren una sesión
+  autenticada del propietario; el token de servicio no es sustituto.
+- `GET /api/runtime/ops` está bloqueado en producción, aun con sesión válida.
+- Migraciones, servicios productivos y deploy requieren autorización separada.

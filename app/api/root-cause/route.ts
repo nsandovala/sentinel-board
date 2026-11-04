@@ -1,18 +1,18 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { tasks, taskChecklistItems, events } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { analyzeRootCause } from "@/lib/server/root-cause-analyzer";
 import { logDockEvent } from "@/lib/server/log-event";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { RootCauseInput } from "@/types/root-cause";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     const body = (await req.json()) as Partial<RootCauseInput>;
 

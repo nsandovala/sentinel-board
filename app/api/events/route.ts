@@ -1,12 +1,14 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { events } from "@/lib/db/schema";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { DockEvent } from "@/types/event";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const rows = await db.select().from(events);
 
@@ -27,9 +29,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     const body = (await req.json()) as { type?: string; message?: string };
     if (!body.type || !body.message) {

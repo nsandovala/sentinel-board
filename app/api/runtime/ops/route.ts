@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeOpsSnapshot, offlineSnapshot, opsUrl } from "@/lib/server/ops-snapshot";
 
@@ -5,10 +6,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
   // This bridge is a local developer surface. Never proxy AA from a deployed SB.
   const host = req.headers.get("host")?.toLowerCase() ?? "";
-  if (process.env.NODE_ENV === "production" || !/^(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(host)) {
+  if (process.env.NODE_ENV === "production" || !["localhost", "127.0.0.1", "[::1]"].includes(req.nextUrl.hostname) || !/^(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(host)) {
     return NextResponse.json(offlineSnapshot(), { status: 403, headers });
   }
   const url = opsUrl(process.env.AMON_OPS_SNAPSHOT_URL);
