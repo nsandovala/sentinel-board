@@ -134,7 +134,7 @@ export function AgentsMode(_props: AgentsModeProps) {
   const [streamPath, setStreamPath] = useState<string | null>(null);
   const [streamConfigured, setStreamConfigured] = useState<boolean | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [, setNow] = useState(Date.now());
+  const [, setNow] = useState(() => Date.now());
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 

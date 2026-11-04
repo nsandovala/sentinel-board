@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,10 +41,15 @@ export function CreateTaskModal({
   const [priority, setPriority] = useState<PriorityLevel>("medium");
   const effectiveProjectId = projectId || projects[0]?.id || "";
 
-  useEffect(() => {
-    if (!open) return;
-    setProjectId(defaultProjectId ?? projects[0]?.id ?? "");
-  }, [defaultProjectId, open, projects]);
+  const [previousDefaults, setPreviousDefaults] = useState({ open, defaultProjectId, projects });
+  if (
+    previousDefaults.open !== open ||
+    previousDefaults.defaultProjectId !== defaultProjectId ||
+    previousDefaults.projects !== projects
+  ) {
+    setPreviousDefaults({ open, defaultProjectId, projects });
+    if (open) setProjectId(defaultProjectId ?? projects[0]?.id ?? "");
+  }
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {

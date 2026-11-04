@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { DockMode } from "./dock-mode-tabs";
@@ -58,6 +59,38 @@ function defaultExpandedHeight(): number {
   return clampExpandedHeight(Math.round(window.innerHeight * 0.5));
 }
 
+interface InitialDockSnapshot {
+  state: DockState;
+  mode: DockMode;
+  height: number;
+}
+
+// This is a one-time hydration snapshot, not a cross-tab preference store.
+const subscribeToInitialSnapshot = () => () => {};
+const getServerSnapshot = () => null;
+
+function createInitialSnapshotReader() {
+  let snapshot: InitialDockSnapshot | null = null;
+  return () => {
+    if (snapshot) return snapshot;
+    let state: DockState = "collapsed";
+    let mode: DockMode = "command";
+    let height = defaultExpandedHeight();
+    try {
+      const storedState = window.localStorage.getItem(LS_STATE);
+      if (VALID_STATES.includes(storedState as DockState)) state = storedState as DockState;
+      const storedMode = window.localStorage.getItem(LS_MODE);
+      if (VALID_MODES.includes(storedMode as DockMode)) mode = storedMode as DockMode;
+      const storedHeight = Number(window.localStorage.getItem(LS_HEIGHT));
+      if (Number.isFinite(storedHeight) && storedHeight > 0) height = clampExpandedHeight(storedHeight);
+    } catch {
+      // Storage may be unavailable; keep the same in-memory defaults.
+    }
+    snapshot = { state, mode, height };
+    return snapshot;
+  };
+}
+
 interface DockController {
   /** True once localStorage has been read — avoids first-paint flicker. */
   hydrated: boolean;
@@ -92,34 +125,20 @@ export function DockProvider({ children }: { children: ReactNode }) {
   // collapsed -> open toggle restores the user's previous choice.
   const lastOpenRef = useRef<Exclude<DockState, "collapsed">>("compact");
 
-  // Hydrate from localStorage once on mount.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const storedState = window.localStorage.getItem(LS_STATE);
-      if (storedState && (VALID_STATES as string[]).includes(storedState)) {
-        setDockStateRaw(storedState as DockState);
-        if (storedState !== "collapsed") {
-          lastOpenRef.current = storedState as Exclude<DockState, "collapsed">;
-        }
-      }
-
-      const storedMode = window.localStorage.getItem(LS_MODE);
-      if (storedMode && (VALID_MODES as string[]).includes(storedMode)) {
-        setDockModeRaw(storedMode as DockMode);
-      }
-
-      const storedHeight = Number(window.localStorage.getItem(LS_HEIGHT));
-      setExpandedHeightRaw(
-        Number.isFinite(storedHeight) && storedHeight > 0
-          ? clampExpandedHeight(storedHeight)
-          : defaultExpandedHeight(),
-      );
-    } catch {
-      setExpandedHeightRaw(defaultExpandedHeight());
-    }
+  // Keep the server and first hydration render identical. React reads the
+  // browser snapshot after hydration; state is adjusted before committing it.
+  const [readInitialSnapshot] = useState(createInitialSnapshotReader);
+  const initialSnapshot = useSyncExternalStore(
+    subscribeToInitialSnapshot,
+    readInitialSnapshot,
+    getServerSnapshot,
+  );
+  if (!hydrated && initialSnapshot) {
+    setDockStateRaw(initialSnapshot.state);
+    setDockModeRaw(initialSnapshot.mode);
+    setExpandedHeightRaw(initialSnapshot.height);
     setHydrated(true);
-  }, []);
+  }
 
   // Re-clamp expanded height when the viewport changes.
   useEffect(() => {
@@ -140,8 +159,11 @@ export function DockProvider({ children }: { children: ReactNode }) {
 
   const setDockState = useCallback(
     (next: DockState) => {
-      setDockStateRaw(next);
-      if (next !== "collapsed") lastOpenRef.current = next;
+      setDockStateRaw((current) => {
+        if (next !== "collapsed") lastOpenRef.current = next;
+        else if (current !== "collapsed") lastOpenRef.current = current;
+        return next;
+      });
       persist(LS_STATE, next);
     },
     [persist],
@@ -166,6 +188,7 @@ export function DockProvider({ children }: { children: ReactNode }) {
 
   const toggleCollapsed = useCallback(() => {
     setDockStateRaw((current) => {
+      if (current !== "collapsed") lastOpenRef.current = current;
       const next: DockState =
         current === "collapsed" ? lastOpenRef.current : "collapsed";
       if (next !== "collapsed") lastOpenRef.current = next;
