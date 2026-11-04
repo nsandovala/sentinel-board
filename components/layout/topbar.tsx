@@ -122,12 +122,14 @@ export function TopBar() {
     [dispatch, priorityFilter, statusFilter, tagFilter],
   );
 
+  // Reset derived search state before committing an inactive search.
+  if (!hasActiveSearch && (results !== null || searching)) {
+    setResults(null);
+    setSearching(false);
+  }
+
   useEffect(() => {
-    if (!hasActiveSearch) {
-      setResults(null);
-      setSearching(false);
-      return;
-    }
+    if (!hasActiveSearch) return;
 
     const ctrl = new AbortController();
     const timeout = setTimeout(async () => {
@@ -215,19 +217,20 @@ export function TopBar() {
 
   const flatCount = flatResults.length;
 
-  // Sincroniza el índice activo con el set actual de resultados
-  useEffect(() => {
-    setActiveIndex((current) =>
-      flatResults.length === 0 ? 0 : Math.min(current, flatResults.length - 1),
-    );
-  }, [flatResults]);
+  // Adjust only when the result set changes; a later expansion must not
+  // resurrect an index that was clamped when results shrank.
+  const [previousResults, setPreviousResults] = useState(results);
+  if (previousResults !== results) {
+    setPreviousResults(results);
+    setActiveIndex((current) => flatCount === 0 ? 0 : Math.min(current, flatCount - 1));
+  }
 
-  // Abre el popover automáticamente cuando hay búsqueda activa o estamos cargando.
-  useEffect(() => {
-    if (hasActiveSearch || searching) {
-      setSearchOpen(true);
-    }
-  }, [hasActiveSearch, searching]);
+  // Preserve explicit dismissals until search activity changes again.
+  const [previousActivity, setPreviousActivity] = useState({ active: false, searching: false });
+  if (previousActivity.active !== hasActiveSearch || previousActivity.searching !== searching) {
+    setPreviousActivity({ active: hasActiveSearch, searching });
+    if (hasActiveSearch || searching) setSearchOpen(true);
+  }
 
   // Cierra al hacer click fuera del wrapper de búsqueda
   useEffect(() => {
