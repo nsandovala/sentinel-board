@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, ChevronDown, ChevronRight, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OpsPanel } from "./ops-panel";
 
 export type AgentStatus = "idle" | "running" | "success" | "error";
 export type RunState = "running" | "done" | "error" | "unknown";
@@ -195,6 +196,7 @@ export function AgentsMode(_props: AgentsModeProps) {
 
   return (
     <div className="flex flex-col gap-2 px-4 py-3">
+      <OpsPanel />
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Bot className="h-3.5 w-3.5 text-muted-foreground/60" aria-hidden />

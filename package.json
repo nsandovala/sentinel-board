@@ -5,12 +5,13 @@
   "scripts": {
     "postinstall": "node scripts/fix-drizzle-tracing.mjs",
     "predev": "node scripts/check-node-version.mjs",
-    "dev": "next dev",
-    "dev:https": "next dev --experimental-https",
+    "dev": "next dev --hostname 127.0.0.1",
+    "dev:https": "next dev --hostname 127.0.0.1 --experimental-https",
     "prebuild": "node scripts/check-node-version.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:ops": "tsx --test lib/server/ops-snapshot.test.ts app/api/runtime/ops/route.test.ts",
     "db:push": "npx drizzle-kit push",
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate",
@@ -53,6 +54,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

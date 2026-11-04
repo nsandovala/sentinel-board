@@ -417,7 +417,7 @@ export async function GET(req: NextRequest) {
 
   const limit = parseLimit(req.nextUrl.searchParams.get("limit"));
   const { path: filePath, configured } = resolveEventsPath();
-  const pathLabel = configured ? path.basename(filePath) : "configured path";
+  const pathLabel = path.basename(filePath);
 
   let exists = false;
   let events: NormalizedEvent[] = [];
@@ -437,7 +437,7 @@ export async function GET(req: NextRequest) {
         {
           ok: false,
           source: "ndjson",
-          path: filePath,
+          path: pathLabel,
           configured,
           exists: false,
           events: [],
@@ -456,7 +456,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     source: "ndjson",
-    path: filePath,
+    path: pathLabel,
     configured,
     exists,
     events,
