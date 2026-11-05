@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 /**
  * GET /api/runtime/events
  *
@@ -15,7 +16,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { open, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -412,7 +412,7 @@ function parseLimit(raw: string | null): number {
 }
 
 export async function GET(req: NextRequest) {
-  const denied = rejectIfUnauthorized(req);
+  const denied = await authorizeApi(req);
   if (denied) return denied;
 
   const limit = parseLimit(req.nextUrl.searchParams.get("limit"));

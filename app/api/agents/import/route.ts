@@ -1,5 +1,5 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 
 /**
  * POST /api/agents/import
@@ -10,9 +10,9 @@ import { rejectIfUnauthorized } from "@/lib/server/request-guard";
  * porque el mapeo de projectId y metadata requiere diseño previo.
  */
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     let body: Record<string, unknown>;
     try {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Internal error",
       },
       { status: 500 }
     );

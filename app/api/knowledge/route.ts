@@ -1,8 +1,8 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeEntries } from "@/lib/db/schema";
-import { rejectIfUnauthorized } from "@/lib/server/request-guard";
 import type { KnowledgeEntry } from "@/types/knowledge";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,8 @@ function mapEntry(row: typeof knowledgeEntries.$inferSelect): KnowledgeEntry {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim();
@@ -73,9 +75,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
-    const denied = rejectIfUnauthorized(req);
-    if (denied) return denied;
 
     const body = (await req.json()) as Partial<KnowledgeEntry>;
 

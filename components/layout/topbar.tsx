@@ -1,5 +1,7 @@
 "use client";
 
+import { UserButton } from "@clerk/nextjs";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, PanelBottom, Search, Filter, FileText, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -742,6 +744,7 @@ export function TopBar() {
           <Plus className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Nueva tarea</span>
         </Button>
+        <UserButton />
       </div>
     </header>
 

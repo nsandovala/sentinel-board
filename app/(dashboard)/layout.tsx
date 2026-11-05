@@ -1,46 +1,20 @@
-"use client";
+import { SignOutButton } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
+import { resolveUserSession } from "@/lib/server/api-auth";
+import DashboardClient from "./dashboard-client";
 
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { TopBar } from "@/components/layout/topbar";
-import { RightPanel } from "@/components/layout/right-panel";
-import { CommandDock } from "@/components/console/command-dock";
-import { SentinelProvider } from "@/lib/state/sentinel-store";
-import { DockProvider } from "@/components/console/dock/dock-context";
-import { ToastProvider } from "@/components/ui/toast";
+export const dynamic = "force-dynamic";
 
-function DashboardShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="dark flex h-screen flex-col bg-background text-foreground font-sans">
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <AppSidebar />
-
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <TopBar />
-          <div className="flex-1 overflow-hidden">{children}</div>
-        </main>
-
-        <RightPanel />
-      </div>
-
-      {/* The dock is the single operational copilot surface — no separate
-          upper terminal. */}
-      <CommandDock />
-    </div>
-  );
-}
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <ToastProvider>
-      <SentinelProvider>
-        <DockProvider>
-          <DashboardShell>{children}</DashboardShell>
-        </DockProvider>
-      </SentinelProvider>
-    </ToastProvider>
-  );
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const principal = await resolveUserSession();
+  if (!principal) redirect("/sign-in");
+  if (!principal.permissions.includes("board:read")) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
+        <h1 className="text-xl font-semibold">Acceso denegado</h1>
+        <SignOutButton redirectUrl="/sign-in"><button type="button">Cerrar sesión</button></SignOutButton>
+      </main>
+    );
+  }
+  return <DashboardClient>{children}</DashboardClient>;
 }

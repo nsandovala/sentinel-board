@@ -107,6 +107,13 @@ HTTPS local opcional: `npm run dev:https`.
 
 ---
 
+## Acceso autenticado
+
+La interfaz y todas las APIs humanas requieren la sesión Clerk del propietario.
+No hay acceso anónimo por localhost. Configure los nombres de variables de
+`.env.example` según [la política de seguridad](docs/SEC-SB-AUTH-01.md).
+Para QA use una instancia Clerk de desarrollo; este parche no configura servicios.
+
 ## Providers IA (opcionales)
 
 | Provider | Costo | Setup |
@@ -120,7 +127,14 @@ HTTPS local opcional: `npm run dev:https`.
 # .env.local
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
 PG_POOL_MAX=10
-SENTINEL_API_TOKEN=optional-token-for-non-loopback-writes
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+AMON_OWNER_CLERK_USER_ID=
+CLERK_AUTHORIZED_PARTIES=
+SENTINEL_PUBLIC_ORIGIN=
+AMON_IMPORT_TOKEN=
+# Legacy import-only credential, optional during rotation:
+SENTINEL_API_TOKEN=
 
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen3:8b

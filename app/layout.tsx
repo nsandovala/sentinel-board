@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import "./globals.css";
@@ -17,11 +18,17 @@ export default function RootLayout({
     "--font-geist-mono": '"SF Mono", "Cascadia Code", "Menlo", "Consolas", monospace',
     "--font-jetbrains-mono": '"Cascadia Code", "SF Mono", "Menlo", "Consolas", monospace',
   } as CSSProperties;
+  // Never allow Clerk's development keyless mode to provision configuration.
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
 
   return (
     <html lang="en">
       <body className="antialiased" style={fontVariables}>
-        {children}
+        {clerkConfigured ? (
+          <ClerkProvider signInUrl="/sign-in" afterSignOutUrl="/sign-in">{children}</ClerkProvider>
+        ) : (
+          <main role="alert">Configuración de autenticación pendiente.</main>
+        )}
       </body>
     </html>
   );

@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/server/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { tasks, taskChecklistItems, events } from "@/lib/db/schema";
@@ -15,6 +16,8 @@ import type { SentinelCard } from "@/types/card";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const rawQuery = Object.fromEntries(req.nextUrl.searchParams.entries());
 
@@ -94,6 +97,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi(req);
+  if (denied) return denied;
   try {
     const body = (await req.json()) as Partial<SentinelCard>;
     if (!body.id || !body.title || !body.projectId) {

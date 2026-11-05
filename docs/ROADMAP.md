@@ -150,7 +150,10 @@ resultado final aparece en el board y en el Timeline.
 
 ## Fase 7 — Security MVP
 
-**Estado:** Futuro.
+**Estado:** Parcial. SEC-SB-AUTH-01 implementa autenticación Clerk y autorización
+de propietario único; QA real de Clerk y aprobación final pendientes. La
+separación multi-workspace descrita abajo sigue fuera del alcance actual.
+Ver [matriz y validaciones](SEC-SB-AUTH-01.md).
 
 **Objetivo:** Llevar SB de "uso single-user en dev" a una superficie con
 identidad, autorización y manejo correcto de secretos.
