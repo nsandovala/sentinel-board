@@ -15,6 +15,7 @@ export function ownerSession(overrides = {}) {
 }
 export async function loadHandlers() {
   process.env.CLERK_AUTHORIZED_PARTIES = origin;
+  process.env.SENTINEL_PUBLIC_ORIGIN = origin;
   process.env.AMON_OWNER_CLERK_USER_ID = "user_fixture_owner";
   process.env.AMON_IMPORT_TOKEN = "fixture-import-only";
   process.env.SENTINEL_API_TOKEN = "fixture-legacy-only";

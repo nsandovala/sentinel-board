@@ -9,4 +9,4 @@ export function authorizeRequest(input: { pathname: string; method: string; head
 export function isAuthorizedOwner(userId: string | null, sessionId: string | null, configuredOwnerId: string | undefined): boolean;
 export function parseAuthorizedParties(value: string | undefined, production: boolean): string[] | null;
 export function principalForClerkSession(userId: string | null, sessionId: string | null, configuredOwnerId: string | undefined, claims: unknown, parties: string[] | null, now?: number): Principal | null;
-export function isAllowedMutationOrigin(headers: Headers, requestOrigin: string, parties: string[] | null): boolean;
+export function isAllowedMutationOrigin(headers: Headers, configuredOrigin: string | undefined, parties: string[] | null, production: boolean): boolean;

@@ -152,7 +152,10 @@ solo `AMON_OWNER_CLERK_USER_ID` recibe permisos humanos. No existe bypass por
 loopback, Host, X-Forwarded-For o X-Real-IP.
 
 Las mutaciones del navegador requieren Origin en `CLERK_AUTHORIZED_PARTIES`
-y coincidencia con el destino. La credencial de servicio solo autoriza
+y coincidencia exacta con `SENTINEL_PUBLIC_ORIGIN`, el destino público
+configurado de este despliegue. No se deriva de la URL interna de Next ni de
+Host/forwarded headers. Si falta o es inválido, se deniega la mutación.
+La credencial de servicio solo autoriza
 `POST /api/agents/import`. `SENTINEL_API_TOKEN` se acepta temporalmente como
 credencial legacy de esa misma importación, sin permisos para otras APIs.
 El puente Ops requiere además loopback y está bloqueado en producción.

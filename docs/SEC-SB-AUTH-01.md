@@ -27,6 +27,10 @@ No hay RBAC general, multi-workspace ni cambios de schema.
   sin paths, credenciales, queries o fragmentos. HTTPS obligatorio en producción;
   HTTP solo loopback fuera de producción. Ausencia o formato inválido cierra el acceso.
 - `AMON_IMPORT_TOKEN`: secreto server-side para importación AA.
+- `SENTINEL_PUBLIC_ORIGIN`: origen público único de este despliegue, también
+  incluido en `CLERK_AUTHORIZED_PARTIES`. HTTPS en producción; HTTP solo en
+  loopback fuera de producción. Ausente, inválido o múltiple: mutaciones humanas
+  rechazadas. En Render es el dominio público, nunca el listener interno.
 - `SENTINEL_API_TOKEN`: credencial legacy opcional durante rotación.
 - `AMON_EVENTS_PATH`, `AMON_OPS_SNAPSHOT_URL`, `DATABASE_URL`: contratos existentes,
   sin cambios de valores ni acceso a su configuración privada en esta validación.
@@ -35,8 +39,9 @@ Sin claves explícitas, el proxy responde 503 y el layout no monta ClerkProvider
 se evita el aprovisionamiento automático keyless de desarrollo del SDK.
 Se conserva `.env.example`. Las claves privadas nunca llevan prefijo
 `NEXT_PUBLIC_`. No derivar orígenes autorizados del Host o de forwarded headers.
-Next normaliza loopback IP a localhost; la comparación contempla esa
-representación solo después de validar exactamente el Origin contra la lista.
+La URL interna de Next puede contener el hostname/puerto de escucha del proceso.
+La comprobación de mutaciones compara Origin con `SENTINEL_PUBLIC_ORIGIN`,
+no con `req.nextUrl.origin`; no confía en Host ni forwarded headers.
 
 ## Matriz de métodos
 
@@ -65,7 +70,7 @@ representación solo después de validar exactamente el Origin contra la lista.
 Total: 19 rutas, 28 handlers explícitos. Métodos no listados, incluidos
 HEAD/OPTIONS automáticos del framework, y rutas desconocidas se deniegan en
 el proxy. Toda mutación humana requiere Origin autorizado coincidente con
-el destino y Sec-Fetch-Site ausente o same-origin. Host, X-Forwarded-For y
+el destino público configurado y Sec-Fetch-Site ausente o same-origin. Host, X-Forwarded-For y
 X-Real-IP no conceden identidad ni permisos.
 
 ## Transición del consumidor AA
@@ -116,6 +121,9 @@ hooks de ciclo de vida. No se cambian versiones existentes deliberadamente.
 `npm run test:auth` prueba la política, los 28 handlers reales con sesiones
 simuladas y DB prohibida, proxy, layout, expiración, logout, origen,
 spoofing, importación/rotación, Runtime/producción, NDJSON y cierre SSE.
+Las regresiones del P1 de Render cubren las mutaciones del propietario con URL
+interna distinta del origen público, rechazo de otros orígenes (aunque estén
+en authorizedParties), configuración ausente/inválida y cabeceras falsificadas.
 Además usa el verificador criptográfico real de Clerk con RSA efímera,
 sin red, comprobando firma, expiración y authorizedParties.
 

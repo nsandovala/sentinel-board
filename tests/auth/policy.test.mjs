@@ -30,14 +30,31 @@ test("authorizedParties is explicit, validated, and never derived from incoming 
   assert.equal(parseAuthorizedParties(origin, true), null);
 });
 
-test("browser mutations require same configured origin, not a forged host", () => {
-  assert.equal(isAllowedMutationOrigin(new Headers({ origin }), origin, [origin]), true);
-  assert.equal(isAllowedMutationOrigin(new Headers({ origin }), "http://localhost:3012", [origin]), true);
-  assert.equal(isAllowedMutationOrigin(new Headers({ origin: "http://localhost:3012" }), "http://localhost:3012", [origin]), false);
+test("browser mutations require the configured public destination, independent of proxy headers", () => {
+  assert.equal(isAllowedMutationOrigin(new Headers({ origin }), origin, [origin], false), true);
+  assert.equal(isAllowedMutationOrigin(new Headers({ origin: "http://localhost:3012" }), origin, [origin], false), false);
   for (const h of [{}, { origin: "null" }, { origin: "https://evil.invalid" }, { origin, "sec-fetch-site": "cross-site" }]) {
-    assert.equal(isAllowedMutationOrigin(new Headers(h), origin, [origin]), false);
+    assert.equal(isAllowedMutationOrigin(new Headers(h), origin, [origin], false), false);
   }
-  assert.equal(isAllowedMutationOrigin(new Headers({ origin: "https://evil.invalid" }), "https://evil.invalid", [origin]), false);
+  const publicOrigin="https://board.example";
+  const forged={origin:"https://evil.invalid",host:"board.example","x-forwarded-host":"board.example","x-forwarded-proto":"https"};
+  assert.equal(isAllowedMutationOrigin(new Headers(forged), publicOrigin, [publicOrigin], true), false);
+  assert.equal(isAllowedMutationOrigin(new Headers({origin:publicOrigin,host:"0.0.0.0:10000"}),publicOrigin,[publicOrigin],true),true);
+});
+
+test("public destination is singular, secure, allowlisted and mandatory", () => {
+  const destination="https://board.example";
+  const headers=new Headers({origin:destination});
+  for (const configured of [undefined,"","null","https://board.example/path","https://user:pass@board.example",
+    "https://board.example?x","https://board.example#fragment","http://board.example",
+    "https://board.example,https://other.example","https://board.example,https://board.example"]) {
+    assert.equal(isAllowedMutationOrigin(headers,configured,[destination],true),false,String(configured));
+  }
+  assert.equal(isAllowedMutationOrigin(headers,destination,null,true),false);
+  assert.equal(isAllowedMutationOrigin(headers,destination,["https://other.example"],true),false);
+  assert.equal(isAllowedMutationOrigin(headers,destination+"/",[destination],true),true);
+  assert.equal(isAllowedMutationOrigin(new Headers({origin}),origin,[origin],false),true);
+  assert.equal(isAllowedMutationOrigin(new Headers({origin}),origin,[origin],true),false);
 });
 
 test("unlisted methods, paths, inherited object keys and trailing components are denied", () => {

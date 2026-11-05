@@ -197,3 +197,51 @@ test("root layout does not provision keyless Clerk or render private children wh
   assert.equal(fallback.props.children,"Configuración de autenticación pendiente.");
   process.env.CLERK_SECRET_KEY=key;
 });
+
+
+test("Render internal listener permits owner mutations only for the configured public origin", async () => {
+  const previous={node:process.env.NODE_ENV,parties:process.env.CLERK_AUTHORIZED_PARTIES,destination:process.env.SENTINEL_PUBLIC_ORIGIN};
+  const publicOrigin="https://board.example";
+  process.env.NODE_ENV="production";
+  process.env.CLERK_AUTHORIZED_PARTIES=publicOrigin+",https://other.example";
+  process.env.SENTINEL_PUBLIC_ORIGIN=publicOrigin;
+  const session=ownerSession();session.sessionClaims.azp=publicOrigin;app.setSession(session);
+  const internalRequest=(url,method,headers={})=>new NextRequest("https://0.0.0.0:10000"+url.replace("[id]","fixture"), {
+    method,headers:{origin:publicOrigin,"sec-fetch-site":"same-origin",host:"0.0.0.0:10000",...headers},body:"{}",
+  });
+  try {
+    for (const e of inventory.filter(e=>e.method!=="GET" && e.url!=="/api/agents/import")) {
+      const req=internalRequest(e.url,e.method);
+      assert.equal(req.nextUrl.origin,"https://0.0.0.0:10000");
+      assert.equal(await app.authorizeApi(req),null,e.method+" "+e.url);
+      assert.equal((await app.proxy(req,{})).status,200,e.method+" "+e.url);
+      for (const origin of ["null","https://evil.invalid","https://other.example","https://0.0.0.0:10000"]) {
+        const forged=internalRequest(e.url,e.method,{origin,host:"board.example","x-forwarded-host":"board.example","x-forwarded-proto":"https","x-real-ip":"127.0.0.1","x-forwarded-for":"127.0.0.1"});
+        assert.equal((await app.authorizeApi(forged)).status,403);
+        assert.equal((await e.handler(forged,{params:Promise.resolve({id:"fixture"})})).status,403);
+      }
+    }
+    // The real POST handler reaches normal input validation (not DB) after auth.
+    assert.equal((await app.routes["/api/tasks"].POST(internalRequest("/api/tasks","POST"))).status,400);
+    // A public Origin never substitutes for a valid owner session.
+    app.setSession({isAuthenticated:false});
+    assert.equal((await app.authorizeApi(internalRequest("/api/tasks","POST"))).status,401);
+    app.setSession({...session,userId:"foreign",sessionClaims:{...session.sessionClaims,sub:"foreign"}});
+    assert.equal((await app.authorizeApi(internalRequest("/api/tasks","POST"))).status,403);
+    app.setSession(session);
+    for (const destination of ["","https://evil.invalid","http://board.example"]) {
+      process.env.SENTINEL_PUBLIC_ORIGIN=destination;
+      assert.equal((await app.authorizeApi(internalRequest("/api/tasks","POST"))).status,403);
+    }
+    delete process.env.SENTINEL_PUBLIC_ORIGIN;
+    assert.equal((await app.authorizeApi(internalRequest("/api/tasks","POST"))).status,403);
+    // Import and reads retain their independent contracts when destination is unset.
+    assert.equal(await app.authorizeApi(request("/api/tasks")),null);
+    assert.equal(await app.authorizeApi(request("/api/agents/import","POST",{authorization:"Bearer fixture-import-only"})),null);
+  } finally {
+    process.env.NODE_ENV=previous.node;
+    process.env.CLERK_AUTHORIZED_PARTIES=previous.parties;
+    process.env.SENTINEL_PUBLIC_ORIGIN=previous.destination;
+    app.setSession(ownerSession());
+  }
+});

@@ -43,6 +43,7 @@ export async function authorizeApi(
   );
   if (status !== 200) return deny(status);
   if (req.method !== "GET" && req.nextUrl.pathname !== "/api/agents/import" &&
-      !isAllowedMutationOrigin(req.headers, req.nextUrl.origin, authorizedParties())) return deny(403);
+      !isAllowedMutationOrigin(req.headers, process.env.SENTINEL_PUBLIC_ORIGIN,
+        authorizedParties(), process.env.NODE_ENV === "production")) return deny(403);
   return null;
 }

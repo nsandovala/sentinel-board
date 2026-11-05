@@ -26,6 +26,10 @@ Desplegar Sentinel Board en Render como `Web Service`, usando Neon/Postgres por 
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - `AMON_OWNER_CLERK_USER_ID`: único usuario autorizado.
 - `CLERK_AUTHORIZED_PARTIES`: orígenes HTTPS exactos, separados por coma.
+- `SENTINEL_PUBLIC_ORIGIN`: origen público HTTPS único de este despliegue,
+  incluido en `CLERK_AUTHORIZED_PARTIES`. En Render usar el dominio público,
+  nunca el listener interno (`0.0.0.0` y su puerto). Las mutaciones se rechazan
+  si falta o es inválido. En desarrollo local admite HTTP en loopback.
 - `AMON_IMPORT_TOKEN`: únicamente `POST /api/agents/import`.
 - `SENTINEL_API_TOKEN`: compatibilidad temporal de importación; retirar después de rotar AA.
 - Ningún acceso anónimo por localhost. El token de servicio no autoriza APIs humanas.
