@@ -7,7 +7,7 @@ import type { CardStatus } from "@/types/enums";
 import type { KnowledgeEntry } from "@/types/knowledge";
 import { STATUS_LABELS } from "@/lib/console/status-labels";
 
-export type ActiveView = "board" | "timeline" | "backlog";
+export type ActiveView = "board" | "timeline" | "backlog" | "missions";
 
 export interface SentinelState {
   projects: Project[];

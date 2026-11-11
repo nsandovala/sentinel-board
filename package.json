@@ -20,7 +20,8 @@
     "db:studio": "npx drizzle-kit studio",
     "test:ui": "node scripts/test-ui.mjs",
     "test:trace": "node scripts/check-production-trace.mjs",
-    "test:auth": "node --test tests/auth/*.test.mjs"
+    "test:auth": "node --test tests/auth/*.test.mjs",
+    "test:mission": "node --import tsx --test lib/mission/*.test.ts lib/server/mission-snapshot.test.ts"
   },
   "engines": {
     "node": ">=20.9 <25"

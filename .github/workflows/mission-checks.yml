@@ -1,0 +1,22 @@
+name: Mission checks
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  read-only-missions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mission
+      - run: npm run test:auth
+      - run: npm run test:ops
+      - run: npx tsc --noEmit
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://fixture:fixture@127.0.0.1:1/mission_build
