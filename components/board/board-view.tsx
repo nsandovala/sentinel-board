@@ -16,6 +16,7 @@ import { CardStatus } from "@/types/enums";
 import { SentinelCard } from "@/types/card";
 import { Column } from "./column";
 import { CardItemOverlay } from "./card-item";
+import { MissionsView } from "@/components/mission/missions-view";
 import {
   Terminal,
   Cpu,
@@ -412,6 +413,8 @@ export function BoardView() {
 
   const visibleCards = filterCardsByProjectId(cards, selectedProjectId);
   const visibleEvents = filterEventsByProjectId(events, selectedProjectId, projects, cards);
+
+  if (activeView === "missions") return <MissionsView />;
 
   if (activeView === "timeline")
     return <TimelineView events={visibleEvents} cards={visibleCards} />;

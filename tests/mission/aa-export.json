@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "sb-mission/1",
+  "generatedAt": "2026-11-11T16:46:36.722Z",
+  "source": "aa-isolated-inspector",
+  "executionAuthorized": false,
+  "mission": {
+    "id": "SUPERVISED-e66eecbe-f0f6-4a4d-ba3f-ac5acf41ab48",
+    "repositoryAlias": "MISSION-TEST",
+    "planHash": "5f134a1270f6e6d5f0fc9bc24a918f8cfd5d2a7c3cfd1721dd6153e2860baafa",
+    "baseSha": "0de545be4d6febc2a4367e801380b987c2fe153a",
+    "branch": "mission-test",
+    "assignmentId": "inspect-fixture",
+    "action": "diagnose",
+    "requiredCapability": "architecture-plan",
+    "proposedRole": "architect",
+    "proposalStatus": "proposed",
+    "permissions": {
+      "host": true,
+      "mission": true,
+      "assignment": true
+    },
+    "candidates": [
+      {
+        "role": "architect",
+        "available": true,
+        "actionCompatible": true,
+        "missingCapabilities": [],
+        "matches": true
+      },
+      {
+        "role": "security",
+        "available": true,
+        "actionCompatible": true,
+        "missingCapabilities": [
+          "architecture-plan"
+        ],
+        "matches": false
+      },
+      {
+        "role": "qa",
+        "available": true,
+        "actionCompatible": false,
+        "missingCapabilities": [
+          "architecture-plan"
+        ],
+        "matches": false
+      },
+      {
+        "role": "ops",
+        "available": true,
+        "actionCompatible": true,
+        "missingCapabilities": [
+          "architecture-plan"
+        ],
+        "matches": false
+      },
+      {
+        "role": "designer",
+        "available": false,
+        "actionCompatible": false,
+        "missingCapabilities": [
+          "architecture-plan"
+        ],
+        "matches": false
+      },
+      {
+        "role": "dev",
+        "available": false,
+        "actionCompatible": false,
+        "missingCapabilities": [
+          "architecture-plan"
+        ],
+        "matches": false
+      }
+    ],
+    "authorizations": [
+      {
+        "id": "3c67e93a-fa2b-49c9-a5e0-d0b33ea23afb",
+        "decision": "revoked",
+        "effectiveStatus": "revoked",
+        "approvedAt": "2026-11-11T16:46:36.019Z",
+        "expiresAt": "2026-11-11T16:47:36.016Z"
+      }
+    ],
+    "observations": [
+      {
+        "authorizationId": "3c67e93a-fa2b-49c9-a5e0-d0b33ea23afb",
+        "status": "completed",
+        "startedAt": "2026-11-11T16:46:36.028Z",
+        "finishedAt": "2026-11-11T16:46:36.702Z",
+        "evidence": {
+          "reference": "INSPECTION-3c67e93a-fa2b-49c9-a5e0-d0b33ea23afb",
+          "headSha": "0de545be4d6febc2a4367e801380b987c2fe153a",
+          "branch": "mission-test",
+          "readmeSha256": "106a4d0ba6b09eb805391d21fa0c74921c7c42c539c94eb3553c608b1a134761"
+        }
+      }
+    ]
+  }
+}

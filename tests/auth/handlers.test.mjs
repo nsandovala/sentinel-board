@@ -23,9 +23,9 @@ const request = (url, method="GET", headers={}, body) => new NextRequest(origin+
 });
 const invoke = (entry, headers={}) => entry.handler(request(entry.url,entry.method,headers),{params:Promise.resolve({id:"fixture"})});
 
-test("inventory covers exactly 28 explicit handlers and every method guards before side effects", async () => {
-  assert.equal(inventory.length,28);
-  assert.equal(Object.keys(app.routes).length,19);
+test("inventory covers exactly 29 explicit handlers and every method guards before side effects", async () => {
+  assert.equal(inventory.length,29);
+  assert.equal(Object.keys(app.routes).length,20);
   for (const e of inventory) {
     assert.ok(permissionFor(e.url.replace("[id]","fixture"),e.method), e.method+" "+e.url);
     const source = await readFile("app"+e.url+"/route.ts","utf8");
@@ -33,7 +33,7 @@ test("inventory covers exactly 28 explicit handlers and every method guards befo
   }
 });
 
-test("all 28 direct handlers deny anonymous, expired, signed-out, foreign and spoofed identities", async () => {
+test("all 29 direct handlers deny anonymous, expired, signed-out, foreign and spoofed identities", async () => {
   const owner = ownerSession();
   const cases = [
     [{isAuthenticated:false},401],
@@ -243,5 +243,28 @@ test("Render internal listener permits owner mutations only for the configured p
     process.env.CLERK_AUTHORIZED_PARTIES=previous.parties;
     process.env.SENTINEL_PUBLIC_ORIGIN=previous.destination;
     app.setSession(ownerSession());
+  }
+});
+
+test("mission projection is owner-only and caller query paths are ignored", async () => {
+  const dir=await mkdtemp(path.join(tmpdir(),"sentinel-mission-auth-"));
+  const { realpath } = await import("node:fs/promises");
+  const canonical=await realpath(dir);
+  const previous=process.env.AMON_MISSIONS_PATH;
+  try {
+    process.env.AMON_MISSIONS_PATH=path.join(canonical,"snapshot.json");
+    await writeFile(process.env.AMON_MISSIONS_PATH,await readFile("tests/mission/aa-export.json"),{mode:0o600});
+    app.setSession(ownerSession());
+    const route=app.routes["/api/missions"].GET;
+    const response=await route(request("/api/missions?path=/private/key"));
+    assert.equal(response.headers.get("cache-control"),"no-store");
+    const body=await response.json();
+    assert.ok(["available","stale"].includes(body.status));
+    assert.equal(body.snapshot.executionAuthorized,false);
+    assert.doesNotMatch(JSON.stringify(body),/private\/key|approvedBy|local-uid/);
+    for(const method of ["POST","PUT","PATCH","DELETE","HEAD","OPTIONS"]) assert.equal(permissionFor("/api/missions",method),null);
+  } finally {
+    if(previous===undefined)delete process.env.AMON_MISSIONS_PATH;else process.env.AMON_MISSIONS_PATH=previous;
+    await rm(dir,{recursive:true,force:true});
   }
 });

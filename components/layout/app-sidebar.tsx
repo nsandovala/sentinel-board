@@ -10,6 +10,7 @@ const views: { key: ActiveView; label: string }[] = [
   { key: "board", label: "Board" },
   { key: "timeline", label: "Timeline" },
   { key: "backlog", label: "Backlog" },
+  { key: "missions", label: "Misiones" },
 ];
 
 export function AppSidebar() {

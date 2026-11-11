@@ -5,6 +5,9 @@ import { TopBar } from "@/components/layout/topbar";
 import { CreateTaskModal } from "@/components/modals/create-task-modal";
 import { DockProvider, useDock } from "@/components/console/dock/dock-context";
 import { SentinelProvider, useSentinel, useSentinelDispatch } from "@/lib/state/sentinel-store";
+import { MissionsView } from "@/components/mission/missions-view";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import missionFixture from "../mission/aa-export.json";
 import type { SearchResponse } from "@/types/knowledge";
 
 declare global {
@@ -19,6 +22,8 @@ const projects = [
   { id: "p2", name: "Fixture Two", slug: "two", status: "active" },
 ];
 const calls: { url: URL; signal?: AbortSignal | null; body?: string; method: string }[] = [];
+let missionReply: unknown = {status: "available", snapshot: missionFixture};
+let missionHttp = 200;
 let searchData: SearchResponse;
 let searchFailure = false;
 let searchHeld = false;
@@ -39,6 +44,7 @@ window.fetch = async (input, init) => {
   const url = new URL(String(input), location.origin);
   calls.push({ url, signal: init?.signal, body: init?.body?.toString(), method: init?.method ?? "GET" });
   if (url.origin !== location.origin) throw new Error("External requests forbidden");
+  if (url.pathname === "/api/missions") return Response.json(missionReply, {status: missionHttp});
   if (url.pathname === "/api/search") {
     if (searchHeld) {
       await new Promise<void>((_, reject) => {
@@ -338,6 +344,60 @@ test("Dock SSR hydration has identical first render and no recoverable errors", 
   await act(async () => { currentRoot = hydrateRoot(host, fixture, { onRecoverableError: e => errors.push(String(e)) }); });
   assert(dock().hydrated && dock().state === "expanded", "Client preferences applied after hydration");
   assert(errors.length === 0, errors.join("\n"));
+});
+
+function MissionNavigationFixture() {
+  const {activeView} = useSentinel();
+  return <><AppSidebar /><StateProbe />{activeView === "missions" && <MissionsView />}</>;
+}
+async function mountMissions() {
+  currentRoot = createRoot(host);
+  await act(async () => { currentRoot!.render(<StrictMode><SentinelProvider><MissionNavigationFixture /></SentinelProvider></StrictMode>); });
+  const button = [...host.querySelectorAll("button")].find(b => b.textContent === "Misiones")!;
+  assert(button, "Mission navigation is available");
+  await act(async () => { button.focus(); button.click(); });
+  await wait(30);
+}
+test("Missions: preserves Board and Backlog navigation, shows revoked and completed independently", async () => {
+  missionHttp = 200; missionReply = {status:"available",snapshot:missionFixture};
+  await mountMissions();
+  assert(state().view === "missions", "Real reducer selects missions");
+  assert(host.textContent?.includes("Revocada") && host.textContent.includes("Inspección completada"), "Historical completion and revocation coexist");
+  for (const label of ["Board", "Backlog"]) {
+    const b = [...host.querySelectorAll("button")].find(b => b.textContent === label)!;
+    assert(b, label + " preserved");
+    await act(async () => { b.click(); });
+    assert(state().view === (label === "Board" ? "board" : "backlog"), "Navigation remains usable");
+  }
+  assert(calls.filter(c => c.url.pathname === "/api/missions").every(c => c.method === "GET" && !c.body), "Read-only API requests");
+});
+test("Missions: auth loss removes old evidence on refresh", async () => {
+  missionHttp=200; missionReply={status:"available",snapshot:missionFixture};
+  await mountMissions();
+  assert(host.textContent?.includes("Inspección completada"), "Initial receipt shown");
+  missionHttp=401; missionReply={error:"Authentication required"};
+  await act(async()=>{[...host.querySelectorAll("button")].find(b=>b.textContent === "Actualizar lectura")!.click();});
+  await wait(30);
+  assert(!host.textContent?.includes("Inspección completada"), "Old evidence cleared");
+  assert(host.textContent?.includes("Vuelve a iniciar sesión"), "Auth failure explained");
+});
+test("Missions: stale, unconfigured and invalid states are explicit", async()=>{
+  missionHttp=200;
+  const old=structuredClone(missionFixture);
+  const offset=Date.now()-600000-Date.parse(old.generatedAt);
+  const shift=(value:string)=>new Date(Date.parse(value)+offset).toISOString();
+  old.generatedAt=shift(old.generatedAt);
+  for(const a of old.mission.authorizations){ if(a.approvedAt)a.approvedAt=shift(a.approvedAt);a.expiresAt=shift(a.expiresAt); }
+  for(const o of old.mission.observations){o.startedAt=shift(o.startedAt);if(o.finishedAt)o.finishedAt=shift(o.finishedAt);}
+  missionReply={status:"stale",snapshot:old};
+  await mountMissions();
+  assert(host.textContent?.includes("Resumen antiguo"),"Stale warning");
+  for(const status of ["unconfigured","invalid"]) {
+    missionReply={status};
+    await act(async()=>{[...host.querySelectorAll("button")].find(b=>b.textContent === "Actualizar lectura")!.click();});await wait(30);
+    assert(!host.textContent?.includes("Inspección completada"),"No fabricated result for "+status);
+    assert(host.textContent?.includes(status === "unconfigured" ? "Aún no hay una fuente" : "No se pudo validar"),status+" visible");
+  }
 });
 
 async function run() {
