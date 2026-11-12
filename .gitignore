@@ -63,3 +63,7 @@ data/*.db-shm
 
 # drizzle
 drizzle/
+
+# Local dependency backups must not be scanned as application sources.
+/node_modules.*
+/.next.hold-*/
