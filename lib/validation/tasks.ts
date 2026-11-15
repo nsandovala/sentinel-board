@@ -183,8 +183,7 @@ const intQuery = (min: number, max: number, fallback: number) =>
     .regex(/^\d+$/, "must be a non-negative integer")
     .transform((s) => Number.parseInt(s, 10))
     .pipe(z.number().int().min(min).max(max))
-    .or(z.undefined())
-    .transform((n) => (n === undefined ? fallback : n));
+    .default(fallback);
 
 export const getTasksQuerySchema = z
   .object({
