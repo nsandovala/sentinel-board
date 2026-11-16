@@ -252,10 +252,15 @@ Modo Runtime del dock:
 Migraciones:
 
 ```bash
-npm run db:generate   # genera SQL en drizzle/
-npm run db:migrate    # aplica en Neon/Render
-npm run db:push       # dev rápido (no genera SQL)
+npm run db:check      # integridad de cadenas y hashes históricos
+npm run db:generate   # genera solo en migrations/fresh/
+npm run db:reproduce  # PostgreSQL vacío en memoria; nunca usa DATABASE_URL
 ```
+
+`drizzle/` conserva el historial QA inmutable. No ejecutar esa cadena en otros
+entornos ni quitar sus guardas. Los destinos externos y los comandos implícitos
+`db:migrate`/`db:push` requieren un procedimiento separado aprobado; hoy quedan
+bloqueados. Ver [DB_MIGRATIONS.md](docs/DB_MIGRATIONS.md).
 
 **Regla:** no romper FKs con cascade. Borrar una task borra sus checklist
 items y comments automáticamente — apoyarse en eso, no duplicar lógica de
@@ -341,8 +346,9 @@ Antes de pedir review:
 - [ ] No hay providers IA llamando fetch sin `validateModel()`
 - [ ] Drag & drop sigue funcionando (cuidado con `stopPropagation` en
       `card-item.tsx`)
-- [ ] Cambios de schema: `db:generate` + `db:migrate` corridos contra Neon
-      en dev y documentados
+- [ ] Cambios de schema: generación con configuración explícita, `db:check` y
+      reproducción en una base desechable autorizada; ejecución externa solo
+      mediante procedimiento específico aprobado y documentado
 - [ ] Si tocaste fases listadas en `docs/ROADMAP.md` o
       `docs/PHASE_LOG.md`, actualizá la entrada correspondiente en el mismo
       PR

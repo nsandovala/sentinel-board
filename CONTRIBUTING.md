@@ -8,9 +8,14 @@ Gracias por tu interes en contribuir. Este documento explica como hacerlo de for
 git clone https://github.com/tu-usuario/sentinel-board.git
 cd sentinel-board
 npm install
-npm run db:push && npm run db:seed
+npm run db:check
+npm run db:reproduce # solo base vacía en memoria
 npm run dev
 ```
+
+La app requiere una base ya preparada y autorizada. La prueba en memoria no
+inicializa `DATABASE_URL`; los destinos externos no se migran automáticamente.
+Ver [cadenas y procedimientos](docs/DB_MIGRATIONS.md).
 
 ## Stack
 

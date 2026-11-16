@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "chains": {
+    "sb-qa-history": {
+      "folder": "drizzle",
+      "mode": "history-only",
+      "immutableSha256": {
+        "0000_thankful_venus.sql": "85fa980d1f8cf3b34056c1fcdebbd56c15a6ed9f67bac612f39c65fcb98b9a29",
+        "0001_lively_daimon_hellstrom.sql": "378e4864f152f0e06a2a4c7b3a616ebde2b681e8fad28c05664e69af83e2f070",
+        "0002_pretty_toad.sql": "938629cb4d087b74c91b3ca190cb876826c115964ea4ae5996179b724296cfe7",
+        "meta/0000_snapshot.json": "2fc5fbd6ca9fb0650e9c6fd37b3ad311efa346e92a5dbbdd550a5b061648fb65",
+        "meta/0001_snapshot.json": "5c0b44a77a4f0f6c5e336b6e946072dd676542ad6ec63beb3ff7490271c05978",
+        "meta/0002_snapshot.json": "8a8ea47e236839c54c3603bbbf47169c26afeb388097dbe5ff68915320941667",
+        "meta/_journal.json": "e4b5313f1843f8762f1a157b1306ecc6b4b2ef6b3d23c4acade2d3de159f1bbf"
+      }
+    },
+    "fresh-disposable": {
+      "folder": "migrations/fresh",
+      "mode": "memory-only"
+    }
+  }
+}
