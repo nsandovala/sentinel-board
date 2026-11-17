@@ -1,0 +1,31 @@
+name: Migration integrity
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  disposable-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify protected history against a trusted revision
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BOOTSTRAP_SHA: ${{ vars.SB_QA_HISTORY_BOOTSTRAP_COMMIT }}
+        run: |
+          if git cat-file -e "$BASE_SHA:migrations/chains.json"; then
+            git show "$BASE_SHA:scripts/check-history-reference.mjs" > "$RUNNER_TEMP/check-history-reference.mjs"
+          else
+            cp scripts/check-history-reference.mjs "$RUNNER_TEMP/check-history-reference.mjs"
+          fi
+          node "$RUNNER_TEMP/check-history-reference.mjs" "$GITHUB_WORKSPACE" "$BASE_SHA" "$BOOTSTRAP_SHA"
+      - run: npm ci
+      - run: npm run db:check
+      - run: npm run test:migrations

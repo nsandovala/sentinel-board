@@ -94,8 +94,9 @@ git clone https://github.com/nsandovala/sentinel-board.git
 cd sentinel-board
 npm install
 cp .env.example .env.local
-# pegar DATABASE_URL de Neon / Render Postgres
-npm run db:push && npm run db:seed
+# configurar DATABASE_URL de una base ya preparada y autorizada
+npm run db:check
+npm run db:reproduce # prueba PostgreSQL en memoria; no inicializa DATABASE_URL
 npm run dev
 ```
 
@@ -104,6 +105,8 @@ La UI funciona sin providers IA — el fallback heurístico analiza texto
 localmente.
 
 HTTPS local opcional: `npm run dev:https`.
+
+Cadenas, límites por entorno y preparación de bases: [Migraciones](docs/DB_MIGRATIONS.md).
 
 ---
 
@@ -287,20 +290,26 @@ Vista filtrada de ideas brutas y bloqueadas, ordenadas por scoring.
 
 | Script | Acción |
 |---|---|
-| `npm run db:push` | Aplica schema directo (dev rápido) |
-| `npm run db:generate` | Genera SQL versionado en `drizzle/` |
-| `npm run db:migrate` | Aplica migraciones pendientes |
-| `npm run db:seed` | Datos iniciales |
-| `npm run db:studio` | Drizzle Studio |
+| `npm run db:check` | Comprueba SQL, snapshots, journal y hashes de ambas cadenas |
+| `npm run db:reproduce` | Reproduce únicamente la cadena de bases vacías en memoria |
+| `npm run test:migrations` | Integridad y pruebas PostgreSQL desechables |
+| `npm run db:generate` | Genera en `migrations/fresh/` con configuración explícita |
+| `npm run db:migrate` | Bloqueado: no existe destino externo implícito aprobado |
+| `npm run db:push` / `npm run db:studio` | Bloqueados por la configuración implícita |
+| `npm run db:seed` | Escritura de datos; requiere autorización independiente |
 
 ### Render / Neon
 
 ```text
-Build Command: npm install && npm run db:migrate && npm run build
+Build Command: npm ci && npm run db:check && npm run build
 Start Command: npm start
 Vars:          DATABASE_URL=postgresql://...
                PG_POOL_MAX=10
 ```
+
+El build no ejecuta migraciones. Preparar o actualizar una base externa requiere
+un procedimiento aprobado para ese entorno; producción continúa pendiente de
+conciliación de esquema e historial. Ver [Migraciones](docs/DB_MIGRATIONS.md).
 
 ---
 

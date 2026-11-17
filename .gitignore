@@ -61,8 +61,7 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 
-# drizzle
-drizzle/
+# Drizzle SQL and snapshots are versioned; do not ignore migration artifacts.
 
 # Local dependency backups must not be scanned as application sources.
 /node_modules.*

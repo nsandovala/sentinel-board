@@ -1,20 +1,7 @@
-import { config as loadEnv } from "dotenv";
+// No implicit target and no .env loading: applied QA history is not portable.
+throw new Error(
+  "No implicit migration target. Run npm run db:check or npm run db:reproduce. " +
+  "Use drizzle.fresh.config.ts only for generation; live QA/production migration is disabled."
+);
 
-loadEnv({ path: ".env.local" });
-loadEnv();
-
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL is required to run Drizzle against Postgres. Define it in .env.local or .env.",
-  );
-}
-
-/** @type {import("drizzle-kit").Config} */
-export default {
-  schema: "./lib/db/schema.ts",
-  out: "./drizzle",
-  dialect: "postgresql",
-  dbCredentials: {
-    url: process.env.DATABASE_URL,
-  },
-};
+export {};
