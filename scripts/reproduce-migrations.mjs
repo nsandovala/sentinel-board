@@ -50,8 +50,27 @@ export async function reproduceMigrations(root = repositoryRoot) {
     const expectedUnique = Object.values(snapshot.tables).reduce((n, t) => n + Object.keys(t.uniqueConstraints).length, 0);
     assert.equal(indexes.filter((i) => i.primary).length, expectedPK);
     assert.equal(indexes.length, expectedIndexes.length + expectedPK + expectedUnique);
-    const fks = (await client.query("SELECT count(*)::int AS n FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid WHERE t.relnamespace='public'::regnamespace AND c.contype='f'")).rows[0].n;
-    assert.equal(fks, Object.values(snapshot.tables).reduce((n, t) => n + Object.keys(t.foreignKeys).length, 0));
+    const actions = { a: "no action", r: "restrict", c: "cascade", n: "set null", d: "set default" };
+    const fks = (await client.query(`
+      SELECT c.conname AS name, source.relname AS "tableFrom", target.relname AS "tableTo",
+        target_ns.nspname AS "schemaTo",
+        ARRAY(SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum ORDER BY k.position) AS "columnsFrom",
+        ARRAY(SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.attnum ORDER BY k.position) AS "columnsTo",
+        c.confdeltype AS "onDelete", c.confupdtype AS "onUpdate"
+      FROM pg_constraint c JOIN pg_class source ON source.oid=c.conrelid
+      JOIN pg_class target ON target.oid=c.confrelid
+      JOIN pg_namespace target_ns ON target_ns.oid=target.relnamespace
+      WHERE source.relnamespace='public'::regnamespace AND c.contype='f'
+    `)).rows.map((fk) => ({ ...fk, onDelete: actions[fk.onDelete], onUpdate: actions[fk.onUpdate] }));
+    const expectedFKs = Object.values(snapshot.tables).flatMap((table) => Object.values(table.foreignKeys).map((fk) => ({
+      name: fk.name, tableFrom: fk.tableFrom, tableTo: fk.tableTo, schemaTo: fk.schemaTo || "public",
+      columnsFrom: fk.columnsFrom, columnsTo: fk.columnsTo,
+      onDelete: (fk.onDelete || "no action").toLowerCase(), onUpdate: (fk.onUpdate || "no action").toLowerCase(),
+    })));
+    const byName = (a, b) => `${a.tableFrom}.${a.name}`.localeCompare(`${b.tableFrom}.${b.name}`);
+    assert.deepEqual(fks.sort(byName), expectedFKs.sort(byName), "Foreign key definitions differ from snapshot");
     for (const table of tables) {
       assert(/^[a-z_]+$/.test(table));
       assert.equal((await client.query(`SELECT count(*)::int AS n FROM "${table}"`)).rows[0].n, 0);
@@ -60,7 +79,7 @@ export async function reproduceMigrations(root = repositoryRoot) {
     assert.deepEqual(ledger, chain.entries.map(({ hash, when }) => ({ hash, created_at: String(when) })));
     await migrate(db, { migrationsFolder: folder });
     assert.deepEqual((await client.query("SELECT hash,created_at::text FROM drizzle.__drizzle_migrations ORDER BY created_at")).rows, ledger);
-    return { result: "PASS", backend: "PGlite in-memory PostgreSQL", tables: tables.length, columns: columns.length, explicitIndexes: expectedIndexes.length, primaryKeys: expectedPK, totalIndexes: indexes.length, foreignKeys: fks, businessRows: 0, ledger, secondRun: "no pending migration", externalConnections: 0 };
+    return { result: "PASS", backend: "PGlite in-memory PostgreSQL", tables: tables.length, columns: columns.length, explicitIndexes: expectedIndexes.length, primaryKeys: expectedPK, totalIndexes: indexes.length, foreignKeys: fks.length, businessRows: 0, ledger, secondRun: "no pending migration", externalConnections: 0 };
   } finally { await client.close(); }
 }
 

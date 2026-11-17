@@ -1,4 +1,5 @@
 import test from "node:test";
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -92,3 +93,53 @@ test("unaltered QA migration refuses an empty non-QA database", async () => {
     assert.equal((await client.query("SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n, 0);
   } finally { await client.close(); }
 });
+
+test("regression: coordinated QA SQL and manifest changes fail against trusted history", (t) => {
+  const root = fixture(t);
+  const trustedHistory = JSON.parse(readFileSync(resolve(repositoryRoot, "migrations/chains.json"))).chains["sb-qa-history"].immutableSha256;
+  const file = resolve(root, "drizzle/0002_pretty_toad.sql");
+  writeFileSync(file, readFileSync(file, "utf8") + "\n-- coordinated mutation\n");
+  mutateJson(resolve(root, "migrations/chains.json"), (v) => {
+    v.chains["sb-qa-history"].immutableSha256["0002_pretty_toad.sql"] = createHash("sha256").update(readFileSync(file)).digest("hex");
+  });
+  assert.throws(() => checkMigrations(root, { trustedHistory }), /Trusted history/);
+});
+for (const mutation of ["missing", "renamed", "empty", "invalid hash", "missing file", "extra file"]) {
+  test(`regression: QA manifest ${mutation} fails closed`, (t) => {
+    const root = fixture(t);
+    mutateJson(resolve(root, "migrations/chains.json"), (v) => {
+      const chain = v.chains["sb-qa-history"];
+      if (mutation === "renamed") chain.renamedHashes = chain.immutableSha256;
+      if (["missing", "renamed"].includes(mutation)) delete chain.immutableSha256;
+      if (mutation === "empty") chain.immutableSha256 = {};
+      if (mutation === "invalid hash") chain.immutableSha256["0002_pretty_toad.sql"] = "not-sha256";
+      if (mutation === "missing file") delete chain.immutableSha256["0002_pretty_toad.sql"];
+      if (mutation === "extra file") chain.immutableSha256["extra.sql"] = "a".repeat(64);
+    });
+    assert.throws(() => checkMigrations(root), /immutableSha256|Immutable history file set/);
+  });
+}
+test("regression: changing FK CASCADE to NO ACTION fails reproduction", async (t) => {
+  const root = fixture(t), file = resolve(root, "migrations/fresh/0000_fresh_baseline.sql");
+  const sql = readFileSync(file, "utf8");
+  const changed = sql.replace(/(card_comments_card_id_tasks_id_fk[^;]*ON DELETE )cascade/i, "$1no action");
+  assert.notEqual(changed, sql, "Fixture must change the card_comments FK");
+  writeFileSync(file, changed);
+  await assert.rejects(reproduceMigrations(root), /Foreign key definitions differ/);
+});
+
+test("trusted history accepts unchanged files and fresh needs no historical hashes", () => {
+  const config = JSON.parse(readFileSync(resolve(repositoryRoot, "migrations/chains.json")));
+  assert.equal(config.chains["fresh-disposable"].immutableSha256, undefined);
+  assert.equal(checkMigrations(repositoryRoot, { trustedHistory: config.chains["sb-qa-history"].immutableSha256 })["sb-qa-history"].entries.length, 3);
+});
+for (const field of ["tableFrom", "columnsFrom", "tableTo", "columnsTo", "onUpdate"]) {
+  test(`foreign key ${field} must match the snapshot`, async (t) => {
+    const root = fixture(t);
+    mutateJson(resolve(root, "migrations/fresh/meta/0000_snapshot.json"), (v) => {
+      const fk = v.tables["public.card_comments"].foreignKeys.card_comments_card_id_tasks_id_fk;
+      fk[field] = { tableFrom: "tasks", columnsFrom: ["id"], tableTo: "projects", columnsTo: ["slug"], onUpdate: "cascade" }[field];
+    });
+    await assert.rejects(reproduceMigrations(root), /Foreign key definitions differ/);
+  });
+}

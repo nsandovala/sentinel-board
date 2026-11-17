@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { validateImmutableManifest, compareTrustedHistory } from "./check-history-reference.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
@@ -68,7 +69,7 @@ export function checkChain(folder, immutable = {}) {
   return { entries: journal.entries.map((entry, i) => ({ tag: entry.tag, when: entry.when, hash: migrations[i].hash })), files: [...files].sort() };
 }
 
-export function checkMigrations(root = repositoryRoot) {
+export function checkMigrations(root = repositoryRoot, { trustedHistory } = {}) {
   const config = readJson(resolve(root, "migrations/chains.json"));
   assert.equal(config.version, 1);
   assert.deepEqual(Object.keys(config.chains).sort(), ["fresh-disposable", "sb-qa-history"]);
@@ -76,6 +77,8 @@ export function checkMigrations(root = repositoryRoot) {
   assert.equal(config.chains["fresh-disposable"].mode, "memory-only");
   assert.equal(config.chains["sb-qa-history"].folder, "drizzle");
   assert.equal(config.chains["fresh-disposable"].folder, "migrations/fresh");
+  validateImmutableManifest(config.chains["sb-qa-history"].immutableSha256);
+  if (trustedHistory !== undefined) compareTrustedHistory(root, trustedHistory);
   const results = {};
   for (const [name, chain] of Object.entries(config.chains)) {
     const folder = realpathSync(resolve(root, chain.folder));

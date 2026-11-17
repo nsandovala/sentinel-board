@@ -84,6 +84,56 @@ integridad y ejecuta las pruebas en memoria en cada PR, sin secretos ni servicio
 externos. La dependencia de prueba es `@electric-sql/pglite` 0.5.16; la validación
 usa Drizzle ORM 0.45.2 y Drizzle Kit 0.31.10 instalados en esta revisión.
 
+## Referencia histórica confiable (PR #8)
+
+`db:check` exige que `sb-qa-history.immutableSha256` exista y contenga
+exactamente los siete archivos históricos, con SHA-256 válidos. Quitar o
+renombrar la propiedad, vaciarla o cambiar su conjunto de archivos falla.
+`fresh-disposable` no necesita hashes históricos. La comprobación local del
+manifiesto no es por sí sola una referencia independiente del PR.
+
+Antes de instalar dependencias, CI compara tanto el manifiesto como los bytes
+históricos con `github.event.pull_request.base.sha`. También ejecuta el
+verificador de esa revisión base, no su reemplazo dentro del PR. Cambiar un SQL
+y actualizar su hash en el mismo PR falla. No se usa `HEAD`, el merge sintético
+ni una rama móvil como referencia confiable.
+
+El PR #8 establece por primera vez esta referencia: su base
+`e7157c617b15e82b484fce87b1b3c7e0eec015fe` aún carece del manifiesto y de los dos
+artefactos de `0002`. Se cotejaron los siete hashes del commit revisado
+`8a50d9d9184d6ccdb89b521878238ebeebf30535` con la copia preservada de SB-QA y,
+para `0002`, con los checksums del paquete autorizado y la confirmación de COMMIT:
+
+| Artefacto restaurado | SHA-256 autorizado |
+|---|---|
+| `0002_pretty_toad.sql` | `938629cb4d087b74c91b3ca190cb876826c115964ea4ae5996179b724296cfe7` |
+| `meta/0002_snapshot.json` | `8a8ea47e236839c54c3603bbbf47169c26afeb388097dbe5ff68915320941667` |
+
+Los cinco archivos ya presentes deben además coincidir byte a byte con la base.
+Los recibos, catálogos y credenciales de QA permanecen privados; esta evidencia
+es un cotejo de archivos locales preservados, no una nueva consulta a Neon.
+
+Para el CI inicial, un mantenedor debe establecer **fuera del PR** la variable
+de repositorio `SB_QA_HISTORY_BOOTSTRAP_COMMIT` al commit revisado completo
+`8a50d9d9184d6ccdb89b521878238ebeebf30535`, después de aprobar ese cotejo.
+Esta corrección local no configura la variable. Si falta, CI falla cerrado.
+El verificador exige que esa referencia tenga exactamente la base como padre,
+que solo se restauren los dos artefactos ausentes conocidos y que sus hashes
+coincidan con sus bytes. Nunca toma el SHA inicial del checkout del PR.
+
+Cuando la base ya contiene el manifiesto, la referencia inicial no se utiliza,
+aunque la variable permanezca definida: manda exclusivamente el commit base.
+Retirar la variable tras integrar el PR #8. No hay opción para omitir el control
+ni aceptar hashes nuevos en un historial establecido. Los cambios del workflow
+y este establecimiento inicial requieren revisión humana: un workflow editable
+no sustituye las reglas de protección del repositorio.
+
+La reproducción también contrasta cada FK con el snapshot: nombre, tabla y
+columnas origen, esquema/tabla y columnas destino, `ON DELETE` y `ON UPDATE`,
+preservando el orden de columnas compuestas. La regresión que cambia el SQL de
+`card_comments` de `CASCADE` a `NO ACTION` debe fallar, aunque sigan existiendo
+cinco FKs.
+
 ## Producción y otros entornos: pendiente
 
 No se accedió a producción ni a Neon SB-QA durante esta corrección. No se alteró
